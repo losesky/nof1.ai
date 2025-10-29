@@ -260,11 +260,17 @@ async function collectMarketData() {
         }
       }
       
-      // 获取所有时间框架的K线数据
-      const [candles1m, candles3m, candles5m, candles15m, candles30m, candles1h] = await Promise.all([
+      // 获取所有时间框架的K线数据（分批请求，避免超时）
+      // 第一批：短周期
+      const [candles1m, candles3m, candles5m] = await Promise.all([
         tradingClient.getFuturesCandles(contract, "1m", 60),
         tradingClient.getFuturesCandles(contract, "3m", 60),
         tradingClient.getFuturesCandles(contract, "5m", 100),
+      ]);
+      
+      // 小延迟后获取第二批：长周期
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const [candles15m, candles30m, candles1h] = await Promise.all([
         tradingClient.getFuturesCandles(contract, "15m", 96),
         tradingClient.getFuturesCandles(contract, "30m", 90),
         tradingClient.getFuturesCandles(contract, "1h", 120)
@@ -1177,6 +1183,7 @@ async function checkAccountThresholds(accountInfo: any): Promise<boolean> {
 async function executeTradingDecision() {
   iterationCount++;
   const minutesElapsed = Math.floor((Date.now() - tradingStartTime.getTime()) / 60000);
+  const intervalMinutes = Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5");
   
   logger.info(`\n${"=".repeat(80)}`);
   logger.info(`交易周期 #${iterationCount} (运行${minutesElapsed}分钟)`);
@@ -1413,10 +1420,10 @@ async function executeTradingDecision() {
       // 不影响主流程，继续执行
     }
     
-    // 7. 获取最近3次的AI决策
+    // 7. 获取上一次的AI决策
     let recentDecisions: any[] = [];
     try {
-      recentDecisions = await getRecentDecisions(3);
+      recentDecisions = await getRecentDecisions(1);
     } catch (error) {
       logger.warn("获取最近决策记录失败:", error as any);
       // 不影响主流程，继续执行
@@ -1426,6 +1433,7 @@ async function executeTradingDecision() {
     const prompt = generateTradingPrompt({
       minutesElapsed,
       iteration: iterationCount,
+      intervalMinutes,
       marketData,
       accountInfo,
       positions,
@@ -1439,7 +1447,7 @@ async function executeTradingDecision() {
     logger.info(prompt);
     logger.info("=".repeat(80) + "\n");
     
-    const agent = createTradingAgent();
+    const agent = createTradingAgent(intervalMinutes);
     
     // 添加重试逻辑以处理网络超时
     let response: any;

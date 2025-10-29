@@ -22,7 +22,7 @@ class TradingMonitor {
         this.cryptoPrices = new Map();
         this.accountData = null;
         this.equityChart = null;
-        this.chartTimeframe = '168'; // 默认7天
+        this.chartTimeframe = '24'; // 固定24小时
         this.init();
     }
 
@@ -127,7 +127,7 @@ class TradingMonitor {
             
             if (!data.positions || data.positions.length === 0) {
                 if (positionsBody) {
-                    positionsBody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无持仓</td></tr>';
+                    positionsBody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无持仓</td></tr>';
                 }
                 return;
             }
@@ -142,10 +142,16 @@ class TradingMonitor {
             if (positionsBody) {
                 positionsBody.innerHTML = data.positions.map(pos => {
                     const profitPercent = ((pos.unrealizedPnl / pos.openValue) * 100).toFixed(2);
+                    const sideText = pos.side === 'long' ? '做多' : '做空';
+                    const sideClass = pos.side === 'long' ? 'positive' : 'negative';
+                    // 开仓倍数 = 开仓价值 / (数量 * 开仓价格)，简化为显示 leverage 字段（如果API提供）
+                    // 否则计算为：开仓价值 / (可用保证金)，这里假设 leverage 可从持仓信息中获取
+                    const leverage = pos.leverage || '-';
                     return `
                         <tr>
                             <td>${pos.symbol}</td>
-                            <td>${pos.quantity}</td>
+                            <td class="${sideClass}">${sideText}</td>
+                            <td>${leverage}x</td>
                             <td>$${pos.entryPrice.toFixed(4)}</td>
                             <td>$${pos.openValue.toFixed(2)}</td>
                             <td>$${pos.currentPrice.toFixed(4)}</td>
@@ -456,8 +462,8 @@ class TradingMonitor {
                         borderWidth: 2,
                         fill: true,
                         tension: 0.4,
-                        pointRadius: historyData.length < 10 ? 4 : 2,
-                        pointHoverRadius: 6
+                        pointRadius: 0,
+                        pointHoverRadius: 0
                     }
                 ]
             },
@@ -536,14 +542,9 @@ class TradingMonitor {
     // 加载资产历史数据
     async loadEquityHistory() {
         try {
-            let limit = 1000; // 默认获取所有数据
-            
-            // 根据时间范围计算需要的数据点数
-            if (this.chartTimeframe !== 'all') {
-                const hours = parseInt(this.chartTimeframe);
-                // 假设每10分钟一个数据点
-                limit = Math.ceil(hours * 6);
-            }
+            // 固定获取最近24小时的数据
+            // 假设每10分钟一个数据点，24小时 = 144个数据点
+            const limit = 144;
             
             const response = await fetch(`/api/history?limit=${limit}`);
             const data = await response.json();
@@ -588,23 +589,15 @@ class TradingMonitor {
             parseFloat((d.totalValue + d.unrealizedPnl).toFixed(2))
         );
         
-        // 调整点的大小
-        this.equityChart.data.datasets[0].pointRadius = historyData.length < 10 ? 4 : 2;
+        // 固定不显示圆点
+        this.equityChart.data.datasets[0].pointRadius = 0;
         
         this.equityChart.update('none'); // 无动画更新
     }
 
-    // 初始化时间范围选择器
+    // 初始化时间范围选择器（已禁用切换功能）
     initTimeframeSelector() {
-        const selector = document.getElementById('chart-timeframe');
-        if (!selector) return;
-
-        selector.value = this.chartTimeframe;
-        
-        selector.addEventListener('change', async (e) => {
-            this.chartTimeframe = e.target.value;
-            await this.updateEquityChart();
-        });
+        // 时间范围已固定为24小时，不再支持切换
     }
 }
 

@@ -212,47 +212,61 @@ export const calculateRiskTool = createTool({
       const totalBalance = Number.parseFloat(account.total || "0") - unrealisedPnl;
       const availableBalance = Number.parseFloat(account.available || "0");
       
-      // 计算每个持仓的风险（需要异步获取合约乘数）
+      // 计算每个持仓的风险（批量处理，避免过多并发）
       const activePositions = positions.filter((p: any) => Number.parseFloat(p.size || "0") !== 0);
       
-      const positionRisks = await Promise.all(
-        activePositions.map(async (p: any) => {
-          const size = Math.abs(Number.parseFloat(p.size || "0"));
-          const entryPrice = Number.parseFloat(p.entryPrice || "0");
-          const leverage = Number.parseInt(p.leverage || "1");
-          const liquidationPrice = Number.parseFloat(p.liqPrice || "0");
-          const currentPrice = Number.parseFloat(p.markPrice || "0");
-          const pnl = Number.parseFloat(p.unrealisedPnl || "0");
-          
-          // 获取合约乘数（修复：正确计算名义价值）
-          let quantoMultiplier = 0.01; // 默认值
-          try {
-            const contractInfo = await client.getContractInfo(p.contract);
-            quantoMultiplier = Number.parseFloat(contractInfo.quantoMultiplier || "0.01");
-          } catch (error: any) {
-            // 使用默认值
-          }
-          
-          // 正确计算名义价值：张数 × 入场价格 × 合约乘数
-          const notionalValue = size * entryPrice * quantoMultiplier;
-          const margin = notionalValue / leverage;
-          
-          // 计算风险百分比（到强平的距离）
-          const riskPercent = currentPrice > 0 
-            ? Math.abs((currentPrice - liquidationPrice) / currentPrice) * 100 
-            : 0;
-          
-          return {
-            contract: p.contract,
-            notionalValue,
-            margin,
-            leverage,
-            pnl,
-            riskPercent,
-            side: Number.parseFloat(p.size || "0") > 0 ? "long" : "short",
-          };
-        })
-      );
+      // 分批处理持仓，每批最多3个
+      const positionRisks: any[] = [];
+      const BATCH_SIZE = 3;
+      
+      for (let i = 0; i < activePositions.length; i += BATCH_SIZE) {
+        const batch = activePositions.slice(i, i + BATCH_SIZE);
+        const batchRisks = await Promise.all(
+          batch.map(async (p: any) => {
+            const size = Math.abs(Number.parseFloat(p.size || "0"));
+            const entryPrice = Number.parseFloat(p.entryPrice || "0");
+            const leverage = Number.parseInt(p.leverage || "1");
+            const liquidationPrice = Number.parseFloat(p.liqPrice || "0");
+            const currentPrice = Number.parseFloat(p.markPrice || "0");
+            const pnl = Number.parseFloat(p.unrealisedPnl || "0");
+            
+            // 获取合约乘数（修复：正确计算名义价值）
+            let quantoMultiplier = 0.01; // 默认值
+            try {
+              const contractInfo = await client.getContractInfo(p.contract);
+              quantoMultiplier = Number.parseFloat(contractInfo.quantoMultiplier || "0.01");
+            } catch (error: any) {
+              // 使用默认值
+            }
+            
+            // 正确计算名义价值：张数 × 入场价格 × 合约乘数
+            const notionalValue = size * entryPrice * quantoMultiplier;
+            const margin = notionalValue / leverage;
+            
+            // 计算风险百分比（到强平的距离）
+            const riskPercent = currentPrice > 0 
+              ? Math.abs((currentPrice - liquidationPrice) / currentPrice) * 100 
+              : 0;
+            
+            return {
+              contract: p.contract,
+              notionalValue,
+              margin,
+              leverage,
+              pnl,
+              riskPercent,
+              side: Number.parseFloat(p.size || "0") > 0 ? "long" : "short",
+            };
+          })
+        );
+        
+        positionRisks.push(...batchRisks);
+        
+        // 批次之间添加小延迟
+        if (i + BATCH_SIZE < activePositions.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
       
       const totalNotional = positionRisks.reduce((sum: number, p: any) => sum + p.notionalValue, 0);
       const totalMargin = positionRisks.reduce((sum: number, p: any) => sum + p.margin, 0);

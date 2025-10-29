@@ -34,7 +34,9 @@ export class BinanceClient implements TradingClient {
   private readonly apiSecret: string;
   private readonly baseUrl: string;
   private timeOffset = 0;
-  private readonly defaultRecvWindow = 5000;
+  private readonly defaultRecvWindow = 60000; // 增加到60秒以容忍更大的时钟偏差
+  private lastSyncTime = 0;
+  private syncPromise: Promise<void> | null = null;
 
   constructor(apiKey: string, apiSecret: string) {
     this.apiKey = apiKey;
@@ -53,10 +55,8 @@ export class BinanceClient implements TradingClient {
     
     logger.info("币安 API 客户端初始化完成");
 
-    // 初始化时同步服务器时间
-    this.syncServerTime().catch(error => {
-      logger.warn("同步服务器时间失败:", error as Error);
-    });
+    // 初始化时同步服务器时间（同步执行，确保完成后再继续）
+    this.syncPromise = this.syncServerTime();
   }
 
   /**
@@ -64,13 +64,38 @@ export class BinanceClient implements TradingClient {
    */
   private async syncServerTime(): Promise<void> {
     try {
+      const localTime = Date.now();
       const response = await this.publicRequest("/fapi/v1/time");
       const serverTime = response.serverTime;
-      this.timeOffset = serverTime - Date.now();
-      logger.info(`服务器时间同步完成，偏差: ${this.timeOffset}ms`);
+      const requestDelay = Date.now() - localTime;
+      
+      // 考虑网络延迟，取中间值
+      this.timeOffset = serverTime - localTime - Math.floor(requestDelay / 2);
+      this.lastSyncTime = Date.now();
+      
+      logger.info(`服务器时间同步完成，偏差: ${this.timeOffset}ms，网络延迟: ${requestDelay}ms`);
     } catch (error) {
       logger.error("同步服务器时间失败:", error as Error);
       throw error;
+    }
+  }
+
+  /**
+   * 确保时间已同步
+   */
+  private async ensureTimeSynced(): Promise<void> {
+    // 如果正在同步，等待完成
+    if (this.syncPromise) {
+      await this.syncPromise;
+      this.syncPromise = null;
+      return;
+    }
+    
+    // 如果超过5分钟未同步，重新同步
+    const timeSinceLastSync = Date.now() - this.lastSyncTime;
+    if (timeSinceLastSync > 5 * 60 * 1000) {
+      logger.info("时间同步已过期，重新同步...");
+      await this.syncServerTime();
     }
   }
 
@@ -98,10 +123,13 @@ export class BinanceClient implements TradingClient {
    * 处理API请求，包含重试、超时和错误处理逻辑
    */
   private async handleRequest(url: URL, options: RequestInit, retries = 3): Promise<any> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
-
     for (let attempt = 1; attempt <= retries; attempt++) {
+      // 每次重试都创建新的 AbortController 和超时时间
+      const controller = new AbortController();
+      // 超时时间随重试次数递增：15秒 -> 20秒 -> 25秒
+      const timeoutMs = 15000 + (attempt - 1) * 5000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
       try {
         options.signal = controller.signal;
         const response = await fetch(url.toString(), options);
@@ -109,6 +137,15 @@ export class BinanceClient implements TradingClient {
 
         if (!response.ok) {
           const error = await response.json();
+          
+          // 如果是时间戳错误 (-1021)，重新同步时间并重试
+          if (error.code === -1021 && attempt < retries) {
+            logger.warn(`时间戳错误，重新同步服务器时间 (${attempt}/${retries})`);
+            await this.syncServerTime();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          
           if (attempt === retries) {
             logger.error(`API请求失败(${attempt}/${retries}):`, error);
             throw new Error(`API请求失败: ${error.msg || error.message || response.statusText}`);
@@ -125,17 +162,17 @@ export class BinanceClient implements TradingClient {
 
         const isTimeout = error.name === 'AbortError' || 
                          error.message?.includes('timeout') ||
-                         error.message?.includes('network error');
+                         error.message?.includes('aborted');
 
         if (attempt === retries) {
           logger.error(`API请求失败(${attempt}/${retries}):`, error);
           throw error;
         }
 
-        logger.warn(`API请求失败(${attempt}/${retries}), ${isTimeout ? '超时' : '错误'}:`, error);
+        logger.warn(`${isTimeout ? '请求超时' : 'API请求失败'}(${attempt}/${retries}), 将在 ${isTimeout ? attempt * 2 : attempt} 秒后重试`);
         
         const delay = isTimeout ? 
-          Math.min(2000 * attempt, 5000) : // 超时情况：2秒、4秒、5秒
+          Math.min(2000 * attempt, 6000) : // 超时情况：2秒、4秒、6秒
           Math.min(1000 * attempt, 3000);  // 其他错误：1秒、2秒、3秒
           
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -164,6 +201,9 @@ export class BinanceClient implements TradingClient {
    * 发送私有请求（需要签名）
    */
   private async privateRequest(endpoint: string, params: any = {}, method = "GET", retries = 3): Promise<any> {
+    // 确保时间已同步
+    await this.ensureTimeSynced();
+    
     const timestamp = this.getServerTime();
     const data = {
       ...params,

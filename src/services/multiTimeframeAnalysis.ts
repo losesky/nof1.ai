@@ -299,14 +299,17 @@ export async function performMultiTimeframeAnalysis(
   
   const timeframes: MultiTimeframeAnalysis["timeframes"] = {};
   
-  // 并行获取所有时间框架数据
+  // 限制并发数量，避免同时发起太多请求导致超时
+  const CONCURRENT_LIMIT = 3; // 每次最多并发3个请求
   const promises: Promise<any>[] = [];
+  const timeframeConfigs = timeframesToUse
+    .map(tfName => ({ name: tfName, config: TIMEFRAMES[tfName] }))
+    .filter(item => item.config);
   
-  for (const tfName of timeframesToUse) {
-    const config = TIMEFRAMES[tfName];
-    if (!config) continue;
-    
-    promises.push(
+  // 分批处理，每批最多CONCURRENT_LIMIT个请求
+  for (let i = 0; i < timeframeConfigs.length; i += CONCURRENT_LIMIT) {
+    const batch = timeframeConfigs.slice(i, i + CONCURRENT_LIMIT);
+    const batchPromises = batch.map(({ name: tfName, config }) =>
       analyzeTimeframe(symbol, config)
         .then(data => {
           const key = tfName.toLowerCase().replace(/_/g, "");
@@ -316,9 +319,15 @@ export async function performMultiTimeframeAnalysis(
           logger.error(`获取 ${symbol} ${config.interval} 数据失败:`, error);
         })
     );
+    
+    // 等待当前批次完成后再处理下一批
+    await Promise.all(batchPromises);
+    
+    // 批次之间添加小延迟，避免请求过于密集
+    if (i + CONCURRENT_LIMIT < timeframeConfigs.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
   }
-  
-  await Promise.all(promises);
   
   // 计算支撑阻力位（基于价格数据）
   const keyLevels = calculateKeyLevels(timeframes);
