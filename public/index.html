@@ -172,25 +172,43 @@
 
     <!-- Account Value Section -->
     <section class="account-section">
-      <div class="account-header">
-        <h2>总资产</h2>
+      <div class="chart-header">
+        <h3 class="chart-title">账户</h3>
       </div>
-      <div class="account-value">
-        <span class="currency-symbol">$</span>
-        <span class="value-amount" id="account-value">0.00</span>
-      </div>
-      <div class="value-change">
-        <span class="change-amount" id="value-change">+$0.00</span>
-        <span class="change-percent" id="value-percent">(+0.00%)</span>
-      </div>
-      <div class="account-details">
-        <div class="detail-item">
-          <span class="detail-label">可用余额</span>
-          <span class="detail-value" id="available-balance">0.00</span>
+      <div class="account-main-value">
+        <div class="main-value-row">
+          <span class="main-value-label">保证金比例</span>
+          <span class="main-value-icon">💰 <span id="roi-percent">--</span></span>
         </div>
-        <div class="detail-item">
+        <div class="main-equity-section">
+          <div class="equity-item">
+            <span class="equity-label-small">维持保证金</span>
+            <span class="equity-value-small" id="maintenance-margin">-- USDT</span>
+          </div>
+          <div class="equity-item">
+            <span class="equity-label-small">保证金余额</span>
+            <span class="equity-value-small" id="margin-balance">-- USDT</span>
+          </div>
+        </div>
+        <div class="wallet-usage-section">
+          <div class="usage-header">
+            <span class="usage-label">钱包余额使用</span>
+            <span class="usage-toggle">单币种保证金模式</span>
+          </div>
+        </div>
+        <div class="total-equity-row">
+          <span class="equity-label">总权益</span>
+          <span class="equity-value" id="total-equity">-- USDT</span>
+        </div>
+      </div>
+      <div class="account-details-grid">
+        <div class="detail-row">
+          <span class="detail-label">钱包余额</span>
+          <span class="detail-value" id="wallet-balance">-- USDT</span>
+        </div>
+        <div class="detail-row">
           <span class="detail-label">未实现盈亏</span>
-          <span class="detail-value" id="unrealised-pnl">+0.00</span>
+          <span class="detail-value pnl" id="unrealised-pnl">-- USDT</span>
         </div>
       </div>
     </section>

@@ -286,7 +286,7 @@ body {
     color: var(--accent-red);
 }
 
-/* Account Section */
+/* Account Section - Binance Style */
 .account-section {
     grid-column: 2 / 3;
     grid-row: 1 / 2;
@@ -299,55 +299,167 @@ body {
 }
 
 .account-header {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .account-header h2 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-weight: normal;
+}
+
+.account-mode {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mode-label {
+    font-size: 0.75rem;
     color: var(--text-dim);
 }
 
-.account-value {
-    font-size: 3rem;
-    font-weight: bold;
-    color: var(--accent-green);
-    text-shadow: 0 0 10px var(--accent-green);
-    margin: 1rem 0;
+.account-main-value {
+    margin-bottom: 1.5rem;
 }
 
-.currency-symbol {
-    font-size: 2rem;
-}
-
-.value-change {
+.main-value-row {
     display: flex;
-    gap: 0.5rem;
-    font-size: 1rem;
-    margin-top: 0.5rem;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
 }
 
-.change-amount {
+.main-value-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.main-value-icon {
+    font-size: 0.85rem;
+}
+
+.main-value-icon .positive {
+    color: var(--accent-green);
+}
+
+.main-value-icon .negative {
     color: var(--accent-red);
 }
 
-.change-percent {
+/* 新增：主要权益部分 */
+.main-equity-section {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    padding: 0.8rem;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.equity-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.equity-label-small {
+    font-size: 0.7rem;
     color: var(--text-dim);
 }
 
-.change-amount.negative {
-    color: var(--accent-green);
+.equity-value-small {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
 }
 
-.account-details {
-    margin-top: 1rem;
-    padding-top: 1rem;
+/* 钱包使用部分 */
+.wallet-usage-section {
+    margin-bottom: 0.8rem;
+    padding: 0.6rem 0;
     border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.usage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.usage-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.usage-toggle {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background-color: var(--bg-tertiary);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+}
+
+/* 货币选择部分 */
+.currency-balance-section {
+    margin-bottom: 0.8rem;
+}
+
+.currency-dropdown {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.currency-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dropdown-icon {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+
+.total-equity-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.3rem;
+}
+
+.equity-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.equity-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.total-equity-usd {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+.account-details-grid {
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
 }
 
-.detail-item {
+.detail-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -355,21 +467,21 @@ body {
 
 .detail-label {
     color: var(--text-dim);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
 }
 
 .detail-value {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    font-weight: bold;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
 }
 
-.detail-value.positive {
-    color: var(--accent-red);
-}
-
-.detail-value.negative {
+.detail-value.pnl.positive {
     color: var(--accent-green);
+}
+
+.detail-value.pnl.negative {
+    color: var(--accent-red);
 }
 
 /* Positions Section */
@@ -814,12 +926,31 @@ body {
         padding: 1rem;
     }
 
-    .account-value {
-        font-size: 2rem;
+    .equity-value {
+        font-size: 1rem;
     }
 
-    .currency-symbol {
-        font-size: 1.5rem;
+    .main-value-label,
+    .equity-label,
+    .detail-label {
+        font-size: 0.7rem;
+    }
+
+    .main-equity-section {
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .equity-label-small {
+        font-size: 0.65rem;
+    }
+
+    .equity-value-small {
+        font-size: 0.8rem;
+    }
+
+    .usage-toggle {
+        font-size: 0.65rem;
     }
 
     /* Tables */

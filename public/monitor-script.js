@@ -64,47 +64,55 @@ class TradingMonitor {
 
             this.accountData = data;
             
-            // 使用和 app.js 相同的算法计算总资产
-            // API 返回的 totalBalance 不包含未实现盈亏
-            // 显示的总资产需要加上未实现盈亏 * 2，以便实时反映持仓盈亏
-            const totalBalanceWithPnl = data.totalBalance + data.unrealisedPnl * 2;
+            // 计算总权益（总资产 + 未实现盈亏）
+            const totalEquity = data.totalBalance + data.unrealisedPnl;
             
-            // 更新总资产
-        const accountValueEl = document.getElementById('account-value');
-            if (accountValueEl) {
-                accountValueEl.textContent = totalBalanceWithPnl.toFixed(2);
+            // 更新收益率（ROI）
+            const roiPercentEl = document.getElementById('roi-percent');
+            if (roiPercentEl) {
+                const roiPercent = ((totalEquity - data.initialBalance) / data.initialBalance) * 100;
+                const roiValue = (roiPercent >= 0 ? '' : '') + roiPercent.toFixed(2) + '%';
+                roiPercentEl.textContent = roiValue;
+                roiPercentEl.className = roiPercent >= 0 ? 'positive' : 'negative';
             }
-
-            // 更新可用余额
-            const availableBalanceEl = document.getElementById('available-balance');
-            if (availableBalanceEl) {
-                availableBalanceEl.textContent = data.availableBalance.toFixed(2);
+            
+            // 更新维持保证金（估算为持仓保证金的10%，实际应从API获取）
+            const maintenanceMarginEl = document.getElementById('maintenance-margin');
+            if (maintenanceMarginEl) {
+                const maintenanceMargin = data.positionMargin * 0.1; // 简化计算
+                maintenanceMarginEl.textContent = maintenanceMargin.toFixed(4) + ' USDT';
             }
-
+            
+            // 更新保证金余额（总资产）
+            const marginBalanceEl = document.getElementById('margin-balance');
+            if (marginBalanceEl) {
+                marginBalanceEl.textContent = data.totalBalance.toFixed(4) + ' USDT';
+            }
+            
+            // 更新总权益
+            const totalEquityEl = document.getElementById('total-equity');
+            if (totalEquityEl) {
+                totalEquityEl.textContent = totalEquity.toFixed(4) + ' USDT';
+            }
+            
+            // 更新总权益（美元显示，与USDT相同）
+            const totalEquityUsdEl = document.getElementById('total-equity-usd');
+            if (totalEquityUsdEl) {
+                totalEquityUsdEl.textContent = totalEquity.toFixed(4) + ' USDT';
+            }
+            
+            // 更新钱包余额（总资产，不含未实现盈亏）
+            const walletBalanceEl = document.getElementById('wallet-balance');
+            if (walletBalanceEl) {
+                walletBalanceEl.textContent = data.totalBalance.toFixed(4) + ' USDT';
+            }
+            
             // 更新未实现盈亏（带符号和颜色）
             const unrealisedPnlEl = document.getElementById('unrealised-pnl');
             if (unrealisedPnlEl) {
-                const pnlValue = (data.unrealisedPnl >= 0 ? '+' : '') + data.unrealisedPnl.toFixed(2);
+                const pnlValue = (data.unrealisedPnl >= 0 ? '' : '') + data.unrealisedPnl.toFixed(4) + ' USDT';
                 unrealisedPnlEl.textContent = pnlValue;
-                unrealisedPnlEl.className = 'detail-value ' + (data.unrealisedPnl >= 0 ? 'positive' : 'negative');
-            }
-
-            // 更新收益（总资产 - 初始资金）
-        const valueChangeEl = document.getElementById('value-change');
-        const valuePercentEl = document.getElementById('value-percent');
-
-            if (valueChangeEl && valuePercentEl) {
-                // 收益率 = (总资产(含未实现盈亏) - 初始资金) / 初始资金 * 100
-                const totalPnl = totalBalanceWithPnl - data.initialBalance;
-                const returnPercent = (totalPnl / data.initialBalance) * 100;
-                const isPositive = totalPnl >= 0;
-                
-                valueChangeEl.textContent = `${isPositive ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}`;
-                valuePercentEl.textContent = `(${isPositive ? '+' : ''}${returnPercent.toFixed(2)}%)`;
-                
-                // 更新颜色
-                valueChangeEl.className = 'change-amount ' + (isPositive ? '' : 'negative');
-                valuePercentEl.className = 'change-percent ' + (isPositive ? '' : 'negative');
+                unrealisedPnlEl.className = 'detail-value pnl ' + (data.unrealisedPnl >= 0 ? 'positive' : 'negative');
             }
             
         } catch (error) {
@@ -164,11 +172,6 @@ class TradingMonitor {
                         </tr>
                     `;
                 }).join('');
-            }
-
-            // 更新终端消息
-            if (data.positions.length > 0) {
-                this.addTerminalLine(`POSITIONS: ${data.positions.length} active`);
             }
             
         } catch (error) {

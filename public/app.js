@@ -111,32 +111,35 @@ async function loadAccountData() {
         const response = await fetch('/api/account');
         const data = await response.json();
         
-
+        // 计算总权益（总资产 + 未实现盈亏）
+        const totalEquity = data.totalBalance + data.unrealisedPnl;
         
-        // 更新可用余额
-        updateValueWithAnimation('availableBalance', data.availableBalance.toFixed(2));
+        // 更新收益率（ROI）
+        const roiPercentEl = document.getElementById('roi-percent');
+        const roiPercent = ((totalEquity - data.initialBalance) / data.initialBalance) * 100;
+        const roiValue = (roiPercent >= 0 ? '' : '') + roiPercent.toFixed(2) + '%';
+        updateValueWithAnimation('roi-percent', roiValue);
+        if (roiPercentEl) {
+            roiPercentEl.className = roiPercent >= 0 ? 'positive' : 'negative';
+        }
+        
+        // 更新总权益
+        updateValueWithAnimation('total-equity', totalEquity.toFixed(4) + ' USDT');
+        
+        // 更新总权益（美元显示，与USDT相同）
+        updateValueWithAnimation('total-equity-usd', totalEquity.toFixed(4) + ' USDT');
+        
+        // 更新钱包余额（可用余额 + 持仓保证金）
+        const walletBalance = data.availableBalance + data.positionMargin;
+        updateValueWithAnimation('wallet-balance', walletBalance.toFixed(4) + ' USDT');
         
         // 更新未实现盈亏（带符号和颜色）
-        // 这个值会根据持仓的实时价格变化而实时更新
-        const unrealisedPnlEl = document.getElementById('unrealisedPnl');
-        const pnlValue = (data.unrealisedPnl >= 0 ? '+' : '') + data.unrealisedPnl.toFixed(2);
-        updateValueWithAnimation('unrealisedPnl', pnlValue);
-        unrealisedPnlEl.className = 'value ' + (data.unrealisedPnl >= 0 ? 'positive' : 'negative');
-        
-        // 更新总资产
-        // API 返回的 totalBalance 不包含未实现盈亏
-        // 显示的总资产需要加上未实现盈亏，以便实时反映持仓盈亏
-        const totalBalanceWithPnl = data.totalBalance + data.unrealisedPnl * 2;
-        updateValueWithAnimation('totalBalance', totalBalanceWithPnl.toFixed(2));
-
-        // 更新收益率（带符号和颜色）
-        // 收益率 = (总资产 - 初始资金) / 初始资金 * 100
-        // 使用包含未实现盈亏的总资产计算，会实时变化
-        const returnPercentEl = document.getElementById('returnPercent');
-        const returnPercent = ((totalBalanceWithPnl - data.initialBalance) / data.initialBalance) * 100;
-        const returnValue = (returnPercent >= 0 ? '+' : '') + returnPercent.toFixed(2) + '%';
-        updateValueWithAnimation('returnPercent', returnValue);
-        returnPercentEl.className = 'value ' + (returnPercent >= 0 ? 'positive' : 'negative');
+        const unrealisedPnlEl = document.getElementById('unrealised-pnl');
+        const pnlValue = (data.unrealisedPnl >= 0 ? '' : '') + data.unrealisedPnl.toFixed(4) + ' USDT';
+        updateValueWithAnimation('unrealised-pnl', pnlValue);
+        if (unrealisedPnlEl) {
+            unrealisedPnlEl.className = 'detail-value pnl ' + (data.unrealisedPnl >= 0 ? 'positive' : 'negative');
+        }
         
     } catch (error) {
         console.error('加载账户数据失败:', error);
