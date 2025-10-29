@@ -67,10 +67,22 @@ export function createApiRoutes() {
         ? Number.parseFloat(initialResult.rows[0].total_value as string)
         : 100;
       
-      // Gate.io 的 account.total 包含了未实现盈亏
-      // 总资产 = total - unrealisedPnl = available + positionMargin
-      const unrealisedPnl = Number.parseFloat(account.unrealisedPnl || "0");
-      const totalBalance = Number.parseFloat(account.total || "0") - unrealisedPnl;
+      // 统一字段名处理（兼容 Binance 和 Gate.io）
+      // Binance: total, available, unrealizedPnl, initialMargin
+      // Gate.io: total, available, unrealised_pnl/unrealisedPnl, position_margin/positionMargin
+      const total = Number.parseFloat(account.total || "0");
+      const available = Number.parseFloat(account.available || "0");
+      const positionMargin = Number.parseFloat(
+        account.initialMargin || account.position_margin || account.positionMargin || "0"
+      );
+      const unrealisedPnl = Number.parseFloat(
+        account.unrealizedPnl || account.unrealised_pnl || account.unrealisedPnl || "0"
+      );
+      
+      // 总资产计算
+      // Binance: total 已经不包含未实现盈亏，total = available + initialMargin
+      // Gate.io: total 包含未实现盈亏，需要减去 unrealisedPnl
+      const totalBalance = total;
       
       // 收益率 = (总资产 - 初始资金) / 初始资金 * 100
       // 总资产不包含未实现盈亏，收益率反映已实现盈亏
@@ -78,8 +90,8 @@ export function createApiRoutes() {
       
       return c.json({
         totalBalance,  // 总资产（不包含未实现盈亏）
-        availableBalance: Number.parseFloat(account.available || "0"),
-        positionMargin: Number.parseFloat(account.positionMargin || "0"),
+        availableBalance: available,
+        positionMargin,
         unrealisedPnl,
         returnPercent,  // 收益率（不包含未实现盈亏）
         initialBalance,
@@ -106,25 +118,35 @@ export function createApiRoutes() {
       
       // 过滤并格式化持仓
       const positions = gatePositions
-        .filter((p: any) => Number.parseInt(p.size || "0") !== 0)
+        .filter((p: any) => Math.abs(Number.parseFloat(p.size || "0")) > 0)
         .map((p: any) => {
-          const size = Number.parseInt(p.size || "0");
-          const symbol = p.contract.replace("_USDT", "");
+          const size = Number.parseFloat(p.size || "0");
+          const symbol = p.contract.replace(/_USDT|USDT/g, "");
           const dbPos = dbPositionsMap.get(symbol);
-          const entryPrice = Number.parseFloat(p.entryPrice || "0");
+          
+          // 统一字段名处理（兼容 Binance 和 Gate.io）
+          // Binance: entryPrice, markPrice, unrealizedPnl
+          // Gate.io: entry_price/entryPrice, mark_price/markPrice, unrealised_pnl/unrealisedPnl
+          const entryPrice = Number.parseFloat(p.entryPrice || p.entry_price || "0");
+          const markPrice = Number.parseFloat(p.markPrice || p.mark_price || "0");
+          const liqPrice = Number.parseFloat(p.liquidationPrice || p.liq_price || p.liqPrice || "0");
+          const unrealizedPnl = Number.parseFloat(p.unrealizedPnl || p.unrealised_pnl || p.unrealisedPnl || "0");
+          const margin = Number.parseFloat(p.margin || "0");
+          
           const quantity = Math.abs(size);
           const leverage = Number.parseInt(p.leverage || "1");
           
-          // 开仓价值（保证金）: 从Gate.io API直接获取
-          const openValue = Number.parseFloat(p.margin || "0");
+          // 开仓价值（保证金）计算
+          // Gate.io 有 margin 字段，Binance 需要计算
+          const openValue = margin > 0 ? margin : (quantity * entryPrice / leverage);
           
           return {
             symbol,
             quantity,
             entryPrice,
-            currentPrice: Number.parseFloat(p.markPrice || "0"),
-            liquidationPrice: Number.parseFloat(p.liqPrice || "0"),
-            unrealizedPnl: Number.parseFloat(p.unrealisedPnl || "0"),
+            currentPrice: markPrice,
+            liquidationPrice: liqPrice,
+            unrealizedPnl,
             leverage,
             side: size > 0 ? "long" : "short",
             openValue,
