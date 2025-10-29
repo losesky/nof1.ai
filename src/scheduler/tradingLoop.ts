@@ -23,7 +23,7 @@ import cron from "node-cron";
 import { createPinoLogger } from "@voltagent/logger";
 import { createClient } from "@libsql/client";
 import { createTradingAgent, generateTradingPrompt, getAccountRiskConfig } from "../agents/tradingAgent";
-import { createGateClient } from "../services/gateClient";
+import { createTradingClient } from "../services/tradingClientFactory";
 import { getChinaTimeISO } from "../utils/timeUtils";
 import { RISK_PARAMS } from "../config/riskParams";
 
@@ -68,162 +68,328 @@ function ensureRange(value: number, min: number, max: number, defaultValue?: num
   return value;
 }
 
+import { MARKET_DATA_QUALITY } from "../config/riskParams";
+
+/**
+ * 验证市场数据有效性
+ */
+function validateMarketData(symbol: string, ticker: any, candles: any[]): { isValid: boolean; warnings: string[] } {
+  const now = Date.now();
+  const warnings: string[] = [];
+  const isTestnet = process.env.BINANCE_USE_TESTNET === "true";
+  
+  // 基本数据验证
+  if (!ticker || typeof ticker !== 'object') {
+    return { isValid: false, warnings: ['行情数据无效'] };
+  }
+
+  // K线数据验证
+  if (!Array.isArray(candles) || candles.length === 0) {
+    return { isValid: false, warnings: ['K线数据无效'] };
+  }
+
+  const currentCandle = candles[candles.length - 1];
+  const previousCandle = candles[candles.length - 2];
+  
+  if (!currentCandle || !currentCandle.timestamp) {
+    return { isValid: false, warnings: ['K线时间戳无效'] };
+  }      // 分析K线数据
+      const currentCandleStartTime = currentCandle.timestamp;
+      const currentCandleAge = now - currentCandleStartTime;
+      const candleEndTime = currentCandleStartTime + 60000; // K线结束时间
+      const isCurrentCandleClosed = now >= candleEndTime; // 是否已完结
+
+      // 获取技术指标
+      const indicators = calculateIndicators(candles);
+      
+      // 输出调试信息
+      logger.debug(`${symbol} K线状态:
+        当前时间: ${new Date(now).toISOString()}
+        K线时间: ${new Date(currentCandleStartTime).toISOString()}
+        已完结: ${isCurrentCandleClosed}
+        延迟: ${Math.floor(currentCandleAge/1000)}秒
+        成交量: ${currentCandle.volume}
+        成交额: ${currentCandle.quoteVolume}
+        成交笔数: ${currentCandle.trades}
+        EMA20: ${indicators.ema20.toFixed(3)}
+        MACD: ${indicators.macd.toFixed(3)}
+        RSI14: ${indicators.rsi14.toFixed(3)}
+      `);
+
+  // 价格数据验证
+  const price = Number(ticker.last);
+  const markPrice = Number(ticker.markPrice);
+  const volume24h = Number(ticker.volume_24h);
+  const volumeUSD24h = Number(ticker.volume_24h_usd);
+  
+  // 验证价格数据
+  if (!price || price <= 0) {
+    warnings.push(`无效价格 (${price})`);
+  }
+  if (!markPrice || markPrice <= 0) {
+    warnings.push(`无效标记价格 (${markPrice})`);
+  }
+
+  // 检查价格偏差
+  if (price && markPrice) {
+    const priceDiff = Math.abs(price - markPrice) / markPrice;
+    const maxDeviation = isTestnet ? 0.01 : 0.005; // 测试网 1%，主网 0.5%
+    if (priceDiff > maxDeviation) {
+      warnings.push(`价格偏差过大: ${(priceDiff * 100).toFixed(2)}%`);
+    }
+  }
+
+  // 成交量相关数据
+  const currentCandleVolume = Number(currentCandle.volume);
+  const currentCandleTrades = Number(currentCandle.trades);
+  const currentCandleQuoteVolume = Number(currentCandle.quoteVolume);
+  
+  // 主网环境的市场数据验证
+  if (!isTestnet) {
+    // 1. 如果当前K线未完结，检查前一根K线的数据
+    if (!isCurrentCandleClosed && previousCandle) {
+      const previousVolume = Number(previousCandle.volume);
+      const previousQuoteVolume = Number(previousCandle.quoteVolume);
+      const previousTrades = Number(previousCandle.trades);
+      
+      if (previousVolume <= 0 || previousQuoteVolume <= 0 || previousTrades <= 0) {
+        logger.debug(`${symbol} 前一K线异常 [${new Date(previousCandle.timestamp).toISOString()}]: 成交量=${previousVolume}, 成交额=${previousQuoteVolume}, 成交笔数=${previousTrades}`);
+      }
+    }
+    // 2. 如果当前K线已完结，严格检查当前K线
+    else if (isCurrentCandleClosed) {
+      if (currentCandleVolume <= 0 || currentCandleQuoteVolume <= 0 || currentCandleTrades <= 0) {
+        warnings.push(`当前已完结K线异常 [${new Date(currentCandleStartTime).toISOString()}]: 成交量=${currentCandleVolume}, 成交额=${currentCandleQuoteVolume}, 成交笔数=${currentCandleTrades}`);
+      }
+    }
+
+    // 3. 检查24小时成交数据
+    if (!volume24h || volume24h <= 0) {
+      warnings.push(`24小时成交量异常 (${volume24h})`);
+    }
+    if (!volumeUSD24h || volumeUSD24h <= 0) {
+      warnings.push(`24小时成交额异常 (${volumeUSD24h})`);
+    }
+
+    // 4. 检查最近K线活跃度
+    const recentCandles = candles.slice(-5); // 最近5根K线
+    const completedCandles = recentCandles.filter(c => now >= (c.timestamp + 60000));
+    if (completedCandles.length > 0) {
+      const inactiveCandles = completedCandles.filter(c => 
+        !c.volume || Number(c.volume) <= 0 || 
+        !c.quoteVolume || Number(c.quoteVolume) <= 0 ||
+        !c.trades || Number(c.trades) <= 0
+      );
+      
+      if (inactiveCandles.length === completedCandles.length) {
+        warnings.push(`最近${completedCandles.length}根已完结K线均无交易`);
+        // 输出详细信息用于调试
+        completedCandles.forEach(c => {
+          logger.debug(`${symbol} 已完结K线 [${new Date(c.timestamp).toISOString()}]: 成交量=${c.volume}, 成交额=${c.quoteVolume}, 成交笔数=${c.trades}`);
+        });
+      }
+    }
+  } else {
+    // 测试网环境的宽松检查
+    if (isCurrentCandleClosed && currentCandleVolume <= 0) {
+      logger.debug(`[测试网] ${symbol} 已完结K线无成交 [${new Date(currentCandleStartTime).toISOString()}]`);
+    }
+  }
+
+  // 检查K线时效性
+  const maxCandleAge = isTestnet ? 180000 : 120000; // 测试网3分钟，主网2分钟
+  if (currentCandleAge > maxCandleAge) {
+    warnings.push(`K线数据延迟: ${Math.floor(currentCandleAge / 1000)}秒`);
+  }
+
+  // 处理警告信息
+  if (warnings.length > 0) {
+    warnings.forEach(warning => {
+      if (isTestnet) {
+        // 测试网环境全部用debug级别
+        logger.debug(`${symbol} 数据质量问题 [${new Date(now).toISOString()}]: ${warning}`);
+      } else {
+        // 主网环境区分处理
+        if (!isCurrentCandleClosed && warning.includes('当前K线')) {
+          // 未完结K线用debug级别
+          logger.debug(`${symbol} 数据质量问题 [${new Date(now).toISOString()}]: ${warning}`);
+        } else {
+          // 其他警告用warn级别
+          logger.warn(`${symbol} 数据质量问题 [${new Date(now).toISOString()}]: ${warning}`);
+        }
+      }
+    });
+  }
+
+  return {
+    isValid: warnings.length === 0,
+    warnings
+  };
+}
+
 /**
  * 收集所有市场数据（包含多时间框架分析和时序数据）
- * 🔥 优化：增加数据验证和错误处理，返回时序数据用于提示词
  */
 async function collectMarketData() {
-  const gateClient = createGateClient();
+  const tradingClient = createTradingClient();
   const marketData: Record<string, any> = {};
 
   for (const symbol of SYMBOLS) {
     try {
       const contract = `${symbol}_USDT`;
       
-      // 🔥 获取价格（带重试）
+      // 获取价格（带重试）
       let ticker: any = null;
       let retryCount = 0;
       const maxRetries = 2;
+      let lastError: any = null;
       
       while (retryCount <= maxRetries) {
         try {
-          ticker = await gateClient.getFuturesTicker(contract);
-          
-          // 🔥 验证价格数据有效性
-          const price = Number.parseFloat(ticker.last || "0");
-          if (price === 0 || !Number.isFinite(price)) {
-            throw new Error(`价格无效: ${ticker.last}`);
-          }
-          
+          ticker = await tradingClient.getFuturesTicker(contract);
           break; // 成功，跳出重试循环
         } catch (error) {
+          lastError = error;
           retryCount++;
           if (retryCount > maxRetries) {
             logger.error(`${symbol} 价格获取失败（${maxRetries}次重试）:`, error as any);
             throw error;
           }
           logger.warn(`${symbol} 价格获取失败，重试 ${retryCount}/${maxRetries}...`);
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // 递增重试延迟
         }
       }
       
       // 获取所有时间框架的K线数据
-      const candles1m = await gateClient.getFuturesCandles(contract, "1m", 60);
-      const candles3m = await gateClient.getFuturesCandles(contract, "3m", 60);
-      const candles5m = await gateClient.getFuturesCandles(contract, "5m", 100);
-      const candles15m = await gateClient.getFuturesCandles(contract, "15m", 96);
-      const candles30m = await gateClient.getFuturesCandles(contract, "30m", 90);
-      const candles1h = await gateClient.getFuturesCandles(contract, "1h", 120);
+      const [candles1m, candles3m, candles5m, candles15m, candles30m, candles1h] = await Promise.all([
+        tradingClient.getFuturesCandles(contract, "1m", 60),
+        tradingClient.getFuturesCandles(contract, "3m", 60),
+        tradingClient.getFuturesCandles(contract, "5m", 100),
+        tradingClient.getFuturesCandles(contract, "15m", 96),
+        tradingClient.getFuturesCandles(contract, "30m", 90),
+        tradingClient.getFuturesCandles(contract, "1h", 120)
+      ]);
+
+      // 确保K线数据正确排序（时间升序）
+      const sortCandles = (candles: any[]) => {
+        return [...candles].sort((a, b) => a.timestamp - b.timestamp);
+      };
+
+      const sortedCandles1m = sortCandles(candles1m);
+      const now = Date.now();
+      const latestCandle = sortedCandles1m[sortedCandles1m.length - 1];
       
-      // 计算每个时间框架的指标
-      const indicators1m = calculateIndicators(candles1m);
-      const indicators3m = calculateIndicators(candles3m);
-      const indicators5m = calculateIndicators(candles5m);
-      const indicators15m = calculateIndicators(candles15m);
-      const indicators30m = calculateIndicators(candles30m);
-      const indicators1h = calculateIndicators(candles1h);
+      // 进行数据质量验证（使用1分钟K线）
+      const dataValidation = validateMarketData(symbol, ticker, sortedCandles1m);
       
-      // 计算3分钟时序指标（使用全部60个数据计算，但只显示最近10个数据点）
-      const intradaySeries = calculateIntradaySeries(candles3m);
-      
-      // 计算1小时指标作为更长期上下文
-      const longerTermContext = calculateLongerTermContext(candles1h);
-      
-      // 使用5分钟K线数据作为主要指标（兼容性）
-      const indicators = indicators5m;
-      
-      // 🔥 验证技术指标有效性和数据完整性
-      const dataTimestamp = new Date().toISOString();
-      const dataQuality = {
-        price: Number.isFinite(Number.parseFloat(ticker.last || "0")),
-        ema20: Number.isFinite(indicators.ema20),
-        macd: Number.isFinite(indicators.macd),
-        rsi14: Number.isFinite(indicators.rsi14) && indicators.rsi14 >= 0 && indicators.rsi14 <= 100,
-        volume: Number.isFinite(indicators.volume) && indicators.volume >= 0,
-        candleCount: {
-          "1m": candles1m.length,
-          "3m": candles3m.length,
-          "5m": candles5m.length,
-          "15m": candles15m.length,
-          "30m": candles30m.length,
-          "1h": candles1h.length,
-        }
+      // 计算各个时间框架的技术指标
+      const timeframeIndicators = {
+        m1: calculateIndicators(sortedCandles1m),
+        m3: calculateIndicators(candles3m),
+        m5: calculateIndicators(candles5m),
+        m15: calculateIndicators(candles15m),
+        m30: calculateIndicators(candles30m),
+        h1: calculateIndicators(candles1h)
       };
       
-      // 记录数据质量问题
+      // 输出技术指标调试信息
+      logger.debug(`${symbol} 技术指标:
+        5分钟K线: EMA20=${timeframeIndicators.m5.ema20.toFixed(3)}, MACD=${timeframeIndicators.m5.macd.toFixed(3)}, RSI14=${timeframeIndicators.m5.rsi14.toFixed(3)}
+        1分钟K线: EMA20=${timeframeIndicators.m1.ema20.toFixed(3)}, MACD=${timeframeIndicators.m1.macd.toFixed(3)}, RSI14=${timeframeIndicators.m1.rsi14.toFixed(3)}
+      `);
+      
+      // 数据质量检查
+      const isTestnet = process.env.BINANCE_USE_TESTNET === "true";
       const issues: string[] = [];
-      if (!dataQuality.price) issues.push("价格无效");
-      if (!dataQuality.ema20) issues.push("EMA20无效");
-      if (!dataQuality.macd) issues.push("MACD无效");
-      if (!dataQuality.rsi14) issues.push("RSI14无效或超出范围");
-      if (!dataQuality.volume) issues.push("成交量无效");
-      if (indicators.volume === 0) issues.push("当前成交量为0");
       
-      if (issues.length > 0) {
-        logger.warn(`${symbol} 数据质量问题 [${dataTimestamp}]: ${issues.join(", ")}`);
-        logger.debug(`${symbol} K线数量:`, dataQuality.candleCount);
-      } else {
-        logger.debug(`${symbol} 数据质量检查通过 [${dataTimestamp}]`);
-      }
-      
-      // 获取资金费率
-      let fundingRate = 0;
-      try {
-        const fr = await gateClient.getFundingRate(contract);
-        fundingRate = Number.parseFloat(fr.r || "0");
-        if (!Number.isFinite(fundingRate)) {
-          fundingRate = 0;
+      if (latestCandle) {
+        const candleTime = new Date(latestCandle.timestamp).toISOString();
+        const age = Math.floor((now - latestCandle.timestamp) / 1000);
+        const isClosed = age >= 60; // K线是否已完结
+        
+        // 构造详细的市场状态信息
+        const marketStatus = {
+          symbol,
+          time: candleTime,
+          age: `${age}秒`,
+          isClosed: isClosed ? "是" : "否",
+          kline: {
+            volume: latestCandle.volume,
+            quoteVolume: latestCandle.quoteVolume,
+            trades: latestCandle.trades,
+            indicators: {
+              ema20: timeframeIndicators.m1.ema20.toFixed(3),
+              macd: timeframeIndicators.m1.macd.toFixed(3),
+              rsi14: timeframeIndicators.m1.rsi14.toFixed(3)
+            }
+          },
+          ticker: {
+            price: ticker.last,
+            markPrice: ticker.markPrice,
+            volume24h: ticker.volume_24h,
+            volumeUsd24h: ticker.volume_24h_usd
+          }
+        };
+
+        // 按环境进行相应的检查
+        if (isTestnet) {
+          // 测试网：记录所有情况但用debug级别
+          if (isClosed && (!latestCandle.volume || Number(latestCandle.volume) <= 0)) {
+            logger.debug(`[测试网] ${symbol} 市场状态: ${JSON.stringify(marketStatus)}`);
+          }
+        } else {
+          // 主网：严格检查
+          if (!latestCandle.volume || !latestCandle.quoteVolume || !latestCandle.trades) {
+            issues.push(`数据格式无效 [${JSON.stringify(marketStatus)}]`);
+          } else if (Number(latestCandle.volume) <= 0 || Number(latestCandle.quoteVolume) <= 0 || Number(latestCandle.trades) <= 0) {
+            if (isClosed) {
+              issues.push(`已完结K线交易异常 [${JSON.stringify(marketStatus)}]`);
+            } else {
+              logger.debug(`${symbol} 当前K线状态 [${JSON.stringify(marketStatus)}]`);
+            }
+          }
+          
+          // 24小时数据检查
+          if (!ticker.volume_24h || Number(ticker.volume_24h) <= 0 || !ticker.volume_24h_usd || Number(ticker.volume_24h_usd) <= 0) {
+            issues.push(`24小时成交异常 [${JSON.stringify(marketStatus)}]`);
+          }
         }
-      } catch (error) {
-        logger.warn(`获取 ${symbol} 资金费率失败:`, error as any);
+      } else {
+        issues.push(`无法获取最新K线数据 [${symbol}] - 请检查网络连接和API状态`);
       }
       
-      // 获取未平仓合约（Open Interest）- Gate.io ticker中没有openInterest字段，暂时跳过
-      let openInterest = { latest: 0, average: 0 };
-      // Note: Gate.io ticker 数据中没有开放持仓量字段，如需可以使用其他API或外部数据源
-      
-      // 将各时间框架指标添加到市场数据
+      // 记录发现的问题
+      issues.forEach(issue => {
+        if (isTestnet) {
+          logger.debug(issue);
+        } else {
+          logger.warn(issue);
+        }
+      });
+
+      // 保存市场数据
       marketData[symbol] = {
-        price: Number.parseFloat(ticker.last || "0"),
-        change24h: Number.parseFloat(ticker.change_percentage || "0"),
-        volume24h: Number.parseFloat(ticker.volume_24h || "0"),
-        fundingRate,
-        openInterest,
-        ...indicators,
-        // 添加时序数据（参照 1.md 格式）
-        intradaySeries,
-        longerTermContext,
-        // 直接添加各时间框架指标
-        timeframes: {
-          "1m": indicators1m,
-          "3m": indicators3m,
-          "5m": indicators5m,
-          "15m": indicators15m,
-          "30m": indicators30m,
-          "1h": indicators1h,
-        },
+        ticker,
+        candles1m: sortedCandles1m,
+        candles3m,
+        candles5m,
+        candles15m,
+        candles30m,
+        candles1h,
+        indicators: timeframeIndicators.m5, // 主要使用5分钟指标
+        indicators1m: timeframeIndicators.m1,
+        indicators3m: timeframeIndicators.m3,
+        indicators5m: timeframeIndicators.m5,
+        indicators15m: timeframeIndicators.m15,
+        indicators30m: timeframeIndicators.m30,
+        indicators1h: timeframeIndicators.h1,
+        isValid: issues.length === 0,
+        lastPrice: Number(ticker?.last || 0)
       };
       
-      // 保存技术指标到数据库（确保所有数值都是有效的）
-      await dbClient.execute({
-        sql: `INSERT INTO trading_signals 
-              (symbol, timestamp, price, ema_20, ema_50, macd, rsi_7, rsi_14, volume, funding_rate)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          symbol,
-          getChinaTimeISO(),
-          ensureFinite(marketData[symbol].price),
-          ensureFinite(indicators.ema20),
-          ensureFinite(indicators.ema50),
-          ensureFinite(indicators.macd),
-          ensureFinite(indicators.rsi7, 50), // RSI 默认 50
-          ensureFinite(indicators.rsi14, 50),
-          ensureFinite(indicators.volume),
-          ensureFinite(fundingRate),
-        ],
-      });
     } catch (error) {
-      logger.error(`收集 ${symbol} 市场数据失败:`, error as any);
+      logger.error(`${symbol} 市场数据获取失败:`, error as any);
+      marketData[symbol] = { error: error as any };
     }
   }
 
@@ -441,73 +607,74 @@ function calcMACD(prices: number[]) {
  * }
  */
 function calculateIndicators(candles: any[]) {
-  if (!candles || candles.length === 0) {
+  if (!Array.isArray(candles) || candles.length === 0) {
     return {
-      currentPrice: 0,
       ema20: 0,
-      ema50: 0,
       macd: 0,
-      rsi7: 50,
       rsi14: 50,
       volume: 0,
-      avgVolume: 0,
+      trades: 0,
+      quoteVolume: 0
     };
   }
 
-  // 处理对象格式的K线数据（Gate.io API返回的是对象，不是数组）
-  const closes = candles
-    .map((c) => {
-      // 如果是对象格式（FuturesCandlestick）
-      if (c && typeof c === 'object' && 'c' in c) {
-        return Number.parseFloat(c.c);
-      }
-      // 如果是数组格式（兼容旧代码）
-      if (Array.isArray(c)) {
-        return Number.parseFloat(c[2]);
-      }
-      return NaN;
-    })
-    .filter(n => Number.isFinite(n));
-
-  const volumes = candles
-    .map((c) => {
-      // 如果是对象格式（FuturesCandlestick）
-      if (c && typeof c === 'object' && 'v' in c) {
-        const vol = Number.parseFloat(c.v);
-        // 验证成交量：必须是有限数字且非负
-        return Number.isFinite(vol) && vol >= 0 ? vol : 0;
-      }
-      // 如果是数组格式（兼容旧代码）
-      if (Array.isArray(c)) {
-        const vol = Number.parseFloat(c[1]);
-        return Number.isFinite(vol) && vol >= 0 ? vol : 0;
-      }
-      return 0;
-    })
-    .filter(n => n >= 0); // 过滤掉负数成交量
-
-  if (closes.length === 0 || volumes.length === 0) {
+  // 提取收盘价序列
+  const closes = candles.map(c => Number(c.close)).filter(p => !isNaN(p) && isFinite(p));
+  
+  if (closes.length === 0) {
     return {
-      currentPrice: 0,
       ema20: 0,
-      ema50: 0,
       macd: 0,
-      rsi7: 50,
       rsi14: 50,
       volume: 0,
-      avgVolume: 0,
+      trades: 0,
+      quoteVolume: 0
     };
   }
 
+  // 计算EMA20
+  const k = 2 / (20 + 1);
+  let ema20 = closes[0];
+  for (let i = 1; i < closes.length; i++) {
+    ema20 = closes[i] * k + ema20 * (1 - k);
+  }
+
+  // 计算MACD
+  const k12 = 2 / (12 + 1);
+  const k26 = 2 / (26 + 1);
+  let ema12 = closes[0];
+  let ema26 = closes[0];
+  for (let i = 1; i < closes.length; i++) {
+    ema12 = closes[i] * k12 + ema12 * (1 - k12);
+    ema26 = closes[i] * k26 + ema26 * (1 - k26);
+  }
+  const macd = ema12 - ema26;
+
+  // 计算RSI14
+  const changes = [];
+  for (let i = 1; i < closes.length; i++) {
+    changes.push(closes[i] - closes[i - 1]);
+  }
+  const period = 14;
+  const gains = changes.filter(c => c > 0);
+  const losses = changes.filter(c => c < 0).map(c => -c);
+  
+  let avgGain = gains.length > 0 ? gains.reduce((a, b) => a + b, 0) / period : 0;
+  let avgLoss = losses.length > 0 ? losses.reduce((a, b) => a + b, 0) / period : 0;
+  
+  const rs = avgLoss === 0 ? (avgGain === 0 ? 1 : Infinity) : avgGain / avgLoss;
+  const rsi14 = 100 - (100 / (1 + rs));
+
+  // 获取最新K线的成交量数据
+  const lastCandle = candles[candles.length - 1];
+  
   return {
-    currentPrice: ensureFinite(closes.at(-1) || 0),
-    ema20: ensureFinite(calcEMA(closes, 20)),
-    ema50: ensureFinite(calcEMA(closes, 50)),
-    macd: ensureFinite(calcMACD(closes)),
-    rsi7: ensureRange(calcRSI(closes, 7), 0, 100, 50),
-    rsi14: ensureRange(calcRSI(closes, 14), 0, 100, 50),
-    volume: ensureFinite(volumes.at(-1) || 0),
-    avgVolume: ensureFinite(volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 0),
+    ema20: Number.isFinite(ema20) ? ema20 : 0,
+    macd: Number.isFinite(macd) ? macd : 0,
+    rsi14: Number.isFinite(rsi14) ? Math.min(100, Math.max(0, rsi14)) : 50,
+    volume: Number(lastCandle?.volume || 0),
+    trades: Number(lastCandle?.trades || 0),
+    quoteVolume: Number(lastCandle?.quoteVolume || 0)
   };
 }
 
@@ -578,10 +745,10 @@ async function calculateSharpeRatio(): Promise<number> {
  * - 监控页面的资金曲线实时更新
  */
 async function getAccountInfo() {
-  const gateClient = createGateClient();
+  const tradingClient = createTradingClient();
   
   try {
-    const account = await gateClient.getFuturesAccount();
+    const account = await tradingClient.getFuturesAccount();
     
     // 从数据库获取初始资金
     const initialResult = await dbClient.execute(
@@ -635,22 +802,30 @@ async function getAccountInfo() {
  * 实时持仓数据应该直接从 Gate.io 获取
  */
 async function syncPositionsFromGate(cachedPositions?: any[]) {
-  const gateClient = createGateClient();
+  const tradingClient = createTradingClient();
   
   try {
     // 如果提供了缓存数据，使用缓存；否则重新获取
-    const gatePositions = cachedPositions || await gateClient.getPositions();
+    const gatePositions = cachedPositions || await tradingClient.getPositions();
     const dbResult = await dbClient.execute("SELECT symbol, sl_order_id, tp_order_id, stop_loss, profit_target, entry_order_id, opened_at FROM positions");
     const dbPositionsMap = new Map(
       dbResult.rows.map((row: any) => [row.symbol, row])
     );
     
-    // 检查 Gate.io 是否有持仓（可能 API 有延迟）
-    const activeGatePositions = gatePositions.filter((p: any) => Number.parseInt(p.size || "0") !== 0);
+    // 检查交易所是否有持仓（考虑不同交易所的格式）
+    const exchangeType = process.env.EXCHANGE_TYPE || 'gate';
+    const activeExchangePositions = exchangeType === 'binance'
+      ? gatePositions.filter((p: any) => Math.abs(Number.parseFloat(p.size || "0")) > 0.00001)
+      : gatePositions.filter((p: any) => Number.parseInt(p.size || "0") !== 0);
     
-    // 如果 Gate.io 返回0个持仓但数据库有持仓，可能是 API 延迟，不清空数据库
-    if (activeGatePositions.length === 0 && dbResult.rows.length > 0) {
-      logger.warn(`⚠️  Gate.io 返回0个持仓，但数据库有 ${dbResult.rows.length} 个持仓，可能是 API 延迟，跳过同步`);
+    // 如果交易所返回0个持仓但数据库有持仓，可能是 API 延迟或持仓已被平仓
+    if (activeExchangePositions.length === 0 && dbResult.rows.length > 0) {
+      logger.warn(`⚠️  交易所返回0个持仓，但数据库有 ${dbResult.rows.length} 个持仓`);
+      logger.warn(`可能原因：1) API 延迟 2) 持仓已被平仓 3) 数据库未同步`);
+      logger.warn(`将清空数据库持仓以保持同步`);
+      // 清空数据库持仓，与交易所保持一致
+      await dbClient.execute("DELETE FROM positions");
+      logger.info(`已清空数据库持仓，与交易所同步`);
       return;
     }
     
@@ -659,21 +834,29 @@ async function syncPositionsFromGate(cachedPositions?: any[]) {
     let syncedCount = 0;
     
     for (const pos of gatePositions) {
-      const size = Number.parseInt(pos.size || "0");
-      if (size === 0) continue;
+      const size = exchangeType === 'binance' 
+        ? Number.parseFloat(pos.size || "0")
+        : Number.parseInt(pos.size || "0");
       
-      const symbol = pos.contract.replace("_USDT", "");
+      if (exchangeType === 'binance' ? Math.abs(size) < 0.00001 : size === 0) continue;
+      
+      // 提取合约名称中的币种符号
+      const contract = pos.contract || '';
+      const symbol = contract.includes('_') 
+        ? contract.replace("_USDT", "")  // Gate.io: BTC_USDT -> BTC
+        : contract.replace("USDT", "");  // 币安: BTCUSDT -> BTC
+      
       let entryPrice = Number.parseFloat(pos.entryPrice || "0");
       let currentPrice = Number.parseFloat(pos.markPrice || "0");
       const leverage = Number.parseInt(pos.leverage || "1");
       const side = size > 0 ? "long" : "short";
       const quantity = Math.abs(size);
-      const unrealizedPnl = Number.parseFloat(pos.unrealisedPnl || "0");
-      let liquidationPrice = Number.parseFloat(pos.liqPrice || "0");
+      const unrealizedPnl = Number.parseFloat(pos.unrealisedPnl || pos.unrealizedPnl || "0");
+      let liquidationPrice = Number.parseFloat(pos.liq_price || pos.liquidationPrice || "0");
       
       if (entryPrice === 0 || currentPrice === 0) {
         try {
-          const ticker = await gateClient.getFuturesTicker(pos.contract);
+          const ticker = await tradingClient.getFuturesTicker(pos.contract);
           if (currentPrice === 0) {
             currentPrice = Number.parseFloat(ticker.markPrice || ticker.last || "0");
           }
@@ -738,26 +921,50 @@ async function syncPositionsFromGate(cachedPositions?: any[]) {
  * @returns 格式化后的持仓数据
  */
 async function getPositions(cachedGatePositions?: any[]) {
-  const gateClient = createGateClient();
+  const tradingClient = createTradingClient();
   
   try {
     // 如果提供了缓存数据，使用缓存；否则重新获取
-    const gatePositions = cachedGatePositions || await gateClient.getPositions();
+    const gatePositions = cachedGatePositions || await tradingClient.getPositions();
+    
+    // 识别交易所类型
+    const exchangeType = process.env.EXCHANGE_TYPE || 'gate';
     
     // 过滤并格式化持仓
     const positions = gatePositions
-      .filter((p: any) => Number.parseInt(p.size || "0") !== 0)
+      .filter((p: any) => {
+        // 根据交易所类型判断持仓是否有效
+        if (exchangeType === 'binance') {
+          // 币安：浮点数数量
+          const size = Number.parseFloat(p.size || "0");
+          return Math.abs(size) > 0.00001; // 浮点数精度阈值
+        } else {
+          // Gate.io: 整数张数
+          const size = Number.parseInt(p.size || "0");
+          return size !== 0;
+        }
+      })
       .map((p: any) => {
-        const size = Number.parseInt(p.size || "0");
+        // 根据交易所类型解析持仓数量
+        const size = exchangeType === 'binance' 
+          ? Number.parseFloat(p.size || "0")
+          : Number.parseInt(p.size || "0");
+        
+        // 提取合约名称中的币种符号
+        const contract = p.contract || '';
+        const symbol = contract.includes('_') 
+          ? contract.replace("_USDT", "")  // Gate.io: BTC_USDT -> BTC
+          : contract.replace("USDT", "");  // 币安: BTCUSDT -> BTC
+        
         return {
-          symbol: p.contract.replace("_USDT", ""),
-          contract: p.contract,
+          symbol,
+          contract,
           quantity: Math.abs(size),
           side: size > 0 ? "long" : "short",
           entry_price: Number.parseFloat(p.entryPrice || "0"),
           current_price: Number.parseFloat(p.markPrice || "0"),
-          liquidation_price: Number.parseFloat(p.liqPrice || "0"),
-          unrealized_pnl: Number.parseFloat(p.unrealisedPnl || "0"),
+          liquidation_price: Number.parseFloat(p.liq_price || p.liquidationPrice || "0"),
+          unrealized_pnl: Number.parseFloat(p.unrealisedPnl || p.unrealizedPnl || "0"),
           leverage: Number.parseInt(p.leverage || "1"),
           margin: Number.parseFloat(p.margin || "0"),
           opened_at: p.create_time || getChinaTimeISO(),
@@ -902,12 +1109,12 @@ async function loadConfigFromDatabase() {
  * 清仓所有持仓
  */
 async function closeAllPositions(reason: string): Promise<void> {
-  const gateClient = createGateClient();
+  const tradingClient = createTradingClient();
   
   try {
     logger.warn(`清仓所有持仓，原因: ${reason}`);
     
-    const positions = await gateClient.getPositions();
+    const positions = await tradingClient.getPositions();
     const activePositions = positions.filter((p: any) => Number.parseInt(p.size || "0") !== 0);
     
     if (activePositions.length === 0) {
@@ -920,9 +1127,9 @@ async function closeAllPositions(reason: string): Promise<void> {
       const symbol = contract.replace("_USDT", "");
       
       try {
-        await gateClient.placeOrder({
+        await tradingClient.placeOrder({
           contract,
-          size: -size,
+          size: 0 - size,
           price: 0, // 市价单必须传 price: 0
         });
         
@@ -1026,8 +1233,8 @@ async function executeTradingDecision() {
     
     // 3. 同步持仓信息（优化：只调用一次API，避免重复）
     try {
-      const gateClient = createGateClient();
-      const rawGatePositions = await gateClient.getPositions();
+      const tradingClient = createTradingClient();
+      const rawGatePositions = await tradingClient.getPositions();
       
       // 使用同一份数据进行处理和同步，避免重复调用API
       positions = await getPositions(rawGatePositions);
@@ -1046,7 +1253,7 @@ async function executeTradingDecision() {
     }
     
     // 4. ====== 强制风控检查（在AI执行前） ======
-    const gateClient = createGateClient();
+    const tradingClient = createTradingClient();
     
     for (const pos of positions) {
       const symbol = pos.symbol;
@@ -1126,7 +1333,7 @@ async function executeTradingDecision() {
           trailingStopPercent = 3;
         }
         
-        // 如果当前盈亏低于移动止损线
+        // 如果当前盈亏低于移动止盈线
         if (pnlPercent < trailingStopPercent && trailingStopPercent > stopLossPercent) {
           shouldClose = true;
           closeReason = `触发移动止盈 (当前 ${pnlPercent.toFixed(2)}% < 移动止损线 ${trailingStopPercent}%)`;
@@ -1153,7 +1360,7 @@ async function executeTradingDecision() {
           const contract = `${symbol}_USDT`;
           const size = side === 'long' ? -pos.quantity : pos.quantity;
           
-          await gateClient.placeOrder({
+          await tradingClient.placeOrder({
             contract,
             size,
             price: 0,
@@ -1234,8 +1441,62 @@ async function executeTradingDecision() {
     
     const agent = createTradingAgent();
     
+    // 添加重试逻辑以处理网络超时
+    let response: any;
+    let retryCount = 0;
+    const maxRetries = 2;
+    let lastError: Error | null = null;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        if (retryCount > 0) {
+          logger.warn(`重试 AI 请求 (${retryCount}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 5000 * retryCount)); // 递增延迟
+        }
+        
+        response = await agent.generateText(prompt);
+        break; // 成功，跳出循环
+        
+      } catch (error: any) {
+        lastError = error;
+        retryCount++;
+        
+        if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT') || error.name === 'AbortError') {
+          logger.error(`AI 请求超时 (尝试 ${retryCount}/${maxRetries + 1}): ${error.message}`);
+          
+          if (retryCount > maxRetries) {
+            logger.error('AI 请求多次超时失败，本次交易周期跳过');
+            logger.error('建议检查：');
+            logger.error('1. 网络连接是否正常');
+            logger.error('2. OpenRouter API 服务是否可用');
+            logger.error('3. 是否需要配置代理（HTTP_PROXY/HTTPS_PROXY）');
+            
+            // 记录失败决策
+            await dbClient.execute({
+              sql: `INSERT INTO agent_decisions 
+                    (timestamp, iteration, market_analysis, decision, actions_taken, account_value, positions_count)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              args: [
+                getChinaTimeISO(),
+                iterationCount,
+                "AI请求超时，无法完成市场分析",
+                "由于网络超时，跳过本次交易周期",
+                "[]",
+                accountInfo.totalWalletBalance,
+                positions.length,
+              ],
+            });
+            
+            return; // 跳过本次周期
+          }
+        } else {
+          logger.error(`AI 请求失败: ${error.message}`);
+          throw error; // 非超时错误，直接抛出
+        }
+      }
+    }
+    
     try {
-      const response = await agent.generateText(prompt);
       
       // 从响应中提取AI的最终决策结果，排除工具调用细节
       let decisionText = "";
@@ -1293,7 +1554,7 @@ async function executeTradingDecision() {
       });
       
       // Agent 执行后重新同步持仓数据（优化：只调用一次API）
-      const updatedRawPositions = await gateClient.getPositions();
+      const updatedRawPositions = await tradingClient.getPositions();
       await syncPositionsFromGate(updatedRawPositions);
       const updatedPositions = await getPositions(updatedRawPositions);
       
@@ -1308,6 +1569,7 @@ async function executeTradingDecision() {
       if (updatedPositions.length === 0) {
         logger.info("持仓: 无");
       } else {
+        const exchangeType = process.env.EXCHANGE_TYPE || 'gate';
         logger.info(`持仓: ${updatedPositions.length} 个`);
         updatedPositions.forEach((pos: any) => {
           // 计算盈亏百分比：考虑杠杆倍数
@@ -1316,7 +1578,13 @@ async function executeTradingDecision() {
             ? ((pos.current_price - pos.entry_price) / pos.entry_price * 100 * (pos.side === 'long' ? 1 : -1))
             : 0;
           const pnlPercent = priceChangePercent * pos.leverage;
-          logger.info(`  ${pos.symbol} ${pos.side === 'long' ? '做多' : '做空'} ${pos.quantity}张 (入场: ${pos.entry_price.toFixed(2)}, 当前: ${pos.current_price.toFixed(2)}, 盈亏: ${pos.unrealized_pnl >= 0 ? '+' : ''}${pos.unrealized_pnl.toFixed(2)} USDT / ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`);
+          
+          // 根据交易所类型显示不同的数量单位
+          const quantityDisplay = exchangeType === 'binance' 
+            ? `${pos.quantity.toFixed(3)} ${pos.symbol}`  // 币安：0.620 ETH
+            : `${pos.quantity}张`;  // Gate.io: 87张
+          
+          logger.info(`  ${pos.symbol} ${pos.side === 'long' ? '做多' : '做空'} ${quantityDisplay} (入场: ${pos.entry_price.toFixed(2)}, 当前: ${pos.current_price.toFixed(2)}, 盈亏: ${pos.unrealized_pnl >= 0 ? '+' : ''}${pos.unrealized_pnl.toFixed(2)} USDT / ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`);
         });
       }
       

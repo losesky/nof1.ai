@@ -22,10 +22,10 @@
 import { Agent, Memory } from "@voltagent/core";
 import { LibSQLMemoryAdapter } from "@voltagent/libsql";
 import { createPinoLogger } from "@voltagent/logger";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import * as tradingTools from "../tools/trading";
 import { formatChinaTime } from "../utils/timeUtils";
 import { RISK_PARAMS } from "../config/riskParams";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
 /**
  * 账户风险配置
@@ -80,13 +80,38 @@ export function generateTradingPrompt(data: {
   for (const [symbol, dataRaw] of Object.entries(marketData)) {
     const data = dataRaw as any;
     
+    // 先检查数据有效性
+    if (data.error) {
+      prompt += `\n${symbol} 数据获取失败: ${data.error.message || '未知错误'}\n\n`;
+      continue;
+    }
+
     prompt += `\n所有 ${symbol} 数据\n`;
-    prompt += `当前价格 = ${data.price.toFixed(1)}, 当前EMA20 = ${data.ema20.toFixed(3)}, 当前MACD = ${data.macd.toFixed(3)}, 当前RSI（7周期） = ${data.rsi7.toFixed(3)}\n\n`;
+
+    // 获取最新的价格和指标数据（使用5分钟指标作为主要参考）
+    const price = data.lastPrice || Number(data.ticker?.last) || null;
+    const indicators = data.indicators || {};
+    const ema20 = indicators.ema20;
+    const macd = indicators.macd;
+    const rsi = indicators.rsi14;
+
+    // 确保所有数据都有效
+    if (price && ema20 !== undefined && macd !== undefined && rsi !== undefined) {
+      prompt += `当前价格 = ${price.toFixed(1)}, 当前EMA20 = ${ema20.toFixed(3)}, 当前MACD = ${macd.toFixed(3)}, 当前RSI（14周期） = ${rsi.toFixed(3)}\n\n`;
+    } else {
+      prompt += `市场数据不完整：${JSON.stringify({
+        price: price !== null ? price.toFixed(1) : "N/A",
+        ema20: ema20 !== undefined ? ema20.toFixed(3) : "N/A",
+        macd: macd !== undefined ? macd.toFixed(3) : "N/A",
+        rsi: rsi !== undefined ? rsi.toFixed(3) : "N/A"
+      }, null, 2)}\n\n`;
+    }
     
     // 资金费率
-    if (data.fundingRate !== undefined) {
+    const fundingRate = data.ticker?.fundingRate;
+    if (fundingRate !== undefined && fundingRate !== null) {
       prompt += `此外，这是 ${symbol} 永续合约的最新资金费率（您交易的合约类型）：\n\n`;
-      prompt += `资金费率: ${data.fundingRate.toExponential(2)}\n\n`;
+      prompt += `资金费率: ${Number(fundingRate).toExponential(2)}\n\n`;
     }
     
     // 日内时序数据（3分钟级别）
@@ -94,8 +119,15 @@ export function generateTradingPrompt(data: {
       const series = data.intradaySeries;
       prompt += `日内序列（按分钟，最旧 → 最新）：\n\n`;
       
-      // Mid prices
-      prompt += `中间价: [${series.midPrices.map((p: number) => p.toFixed(1)).join(", ")}]\n\n`;
+      // 检查并格式化数据
+      const midPrices = series.midPrices?.filter((p: number | undefined | null): p is number => 
+        p !== undefined && p !== null
+      );
+      if (midPrices && midPrices.length > 0) {
+        prompt += `中间价: [${midPrices.map((p: number) => p.toFixed(1)).join(", ")}]\n\n`;
+      } else {
+        prompt += `中间价数据不可用\n\n`;
+      }
       
       // EMA indicators (20‑period)
       prompt += `EMA指标（20周期）: [${series.ema20Series.map((e: number) => e.toFixed(3)).join(", ")}]\n\n`;
@@ -305,9 +337,33 @@ export function generateTradingPrompt(data: {
 /**
  * 创建交易 Agent
  */
+/**
+ * 创建交易 Agent
+ */
 export function createTradingAgent() {
   const openrouter = createOpenRouter({
     apiKey: process.env.OPENROUTER_API_KEY || "",
+    fetch: async (url, init) => {
+      // 自定义 fetch 函数，增加超时和重试逻辑
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+      
+      try {
+        const response = await fetch(url, {
+          ...init,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          logger.error('OpenRouter API 请求超时（60秒）');
+          throw new Error('API request timeout after 60 seconds');
+        }
+        throw error;
+      }
+    },
   });
 
   const memory = new Memory({

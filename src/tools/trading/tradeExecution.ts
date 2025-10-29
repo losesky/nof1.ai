@@ -21,7 +21,8 @@
  */
 import { createTool } from "@voltagent/core";
 import { z } from "zod";
-import { createGateClient } from "../../services/gateClient";
+import { createTradingClient } from "../../services/tradingClientFactory";
+import { formatContract } from "../../utils/tradingUtils";
 import { createClient } from "@libsql/client";
 import { createPinoLogger } from "@voltagent/logger";
 import { getChinaTimeISO } from "../../utils/timeUtils";
@@ -52,8 +53,8 @@ export const openPositionTool = createTool({
     // 开仓时不设置止盈止损，由 AI 在每个周期主动决策
     const stopLoss = undefined;
     const takeProfit = undefined;
-    const client = createGateClient();
-    const contract = `${symbol}_USDT`;
+    const client = createTradingClient();
+    const contract = formatContract(symbol);
     
     try {
       //  参数验证
@@ -168,43 +169,94 @@ export const openPositionTool = createTool({
       const currentPrice = Number.parseFloat(ticker.last || "0");
       const contractInfo = await client.getContractInfo(contract);
       
-      // Gate.io 永续合约的保证金计算
-      // 注意：Gate.io 使用"张数"作为单位，每张合约代表一定数量的币
-      // 对于 BTC_USDT: 1张 = 0.0001 BTC
-      // 保证金计算：保证金 = (张数 * quantoMultiplier * 价格) / 杠杆
+      // 根据交易所类型使用不同的数量计算方式
+      const exchangeType = process.env.EXCHANGE_TYPE || 'binance';
       
-      //  修复：使用正确的字段名 quantoMultiplier（驼峰命名），不是 quanto_multiplier
-      const quantoMultiplier = Number.parseFloat(contractInfo.quantoMultiplier || "0.01");
-      const minSize = Number.parseInt(contractInfo.orderSizeMin || "1");
-      const maxSize = Number.parseInt(contractInfo.orderSizeMax || "1000000");
+      let quantity: number;
+      let minSize: number;
+      let maxSize: number;
+      let actualMargin: number;
       
-      // 计算可以开多少张合约
-      // adjustedAmountUsdt = (quantity * quantoMultiplier * currentPrice) / leverage
-      // => quantity = (adjustedAmountUsdt * leverage) / (quantoMultiplier * currentPrice)
-      let quantity = (adjustedAmountUsdt * leverage) / (quantoMultiplier * currentPrice);
-      
-      // 向下取整到整数张数（合约必须是整数）
-      quantity = Math.floor(quantity);
-      
-      // 确保数量在允许范围内
-      quantity = Math.max(quantity, minSize);
-      quantity = Math.min(quantity, maxSize);
+      if (exchangeType === 'binance') {
+        // ===== 币安 U本位合约计算逻辑 =====
+        // 币安使用币种数量作为单位（如 BTC, ETH）
+        // 保证金计算：保证金 = (数量 × 价格) / 杠杆
+        
+        // 从合约信息获取最小/最大数量限制
+        const filters = contractInfo.filters || [];
+        const lotSizeFilter = filters.find((f: any) => f.filterType === 'LOT_SIZE');
+        const minQty = lotSizeFilter ? Number.parseFloat(lotSizeFilter.minQty) : 0.001;
+        const maxQty = lotSizeFilter ? Number.parseFloat(lotSizeFilter.maxQty) : 1000000;
+        const stepSize = lotSizeFilter ? Number.parseFloat(lotSizeFilter.stepSize) : 0.001;
+        
+        minSize = minQty;
+        maxSize = maxQty;
+        
+        // 计算可以购买的币种数量
+        // adjustedAmountUsdt = (quantity × price) / leverage
+        // => quantity = (adjustedAmountUsdt × leverage) / price
+        quantity = (adjustedAmountUsdt * leverage) / currentPrice;
+        
+        // 向下取整到stepSize的整数倍
+        quantity = Math.floor(quantity / stepSize) * stepSize;
+        
+        // 确保数量在允许范围内
+        quantity = Math.max(quantity, minSize);
+        quantity = Math.min(quantity, maxSize);
+        
+        // 计算实际使用的保证金
+        actualMargin = (quantity * currentPrice) / leverage;
+        
+        // 验证：确保不超过可用余额
+        if (actualMargin > availableBalance) {
+          quantity = (availableBalance * leverage) / currentPrice;
+          quantity = Math.floor(quantity / stepSize) * stepSize;
+          actualMargin = (quantity * currentPrice) / leverage;
+          logger.warn(`调整数量以适应可用余额: ${quantity.toFixed(3)} ${symbol}, 保证金: ${actualMargin.toFixed(2)} USDT`);
+        }
+        
+        logger.info(`开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${quantity.toFixed(3)} ${symbol} (杠杆${leverage}x, 保证金${actualMargin.toFixed(2)} USDT)`);
+        
+      } else {
+        // ===== Gate.io 永续合约计算逻辑 =====
+        // Gate.io 使用"张数"作为单位，每张合约代表一定数量的币
+        // 对于 BTC_USDT: 1张 = 0.0001 BTC
+        // 保证金计算：保证金 = (张数 × quantoMultiplier × 价格) / 杠杆
+        
+        const quantoMultiplier = Number.parseFloat(contractInfo.quantoMultiplier || "0.01");
+        minSize = Number.parseInt(contractInfo.orderSizeMin || "1");
+        maxSize = Number.parseInt(contractInfo.orderSizeMax || "1000000");
+        
+        // 计算可以开多少张合约
+        // adjustedAmountUsdt = (quantity × quantoMultiplier × price) / leverage
+        // => quantity = (adjustedAmountUsdt × leverage) / (quantoMultiplier × price)
+        quantity = (adjustedAmountUsdt * leverage) / (quantoMultiplier * currentPrice);
+        
+        // 向下取整到整数张数（合约必须是整数）
+        quantity = Math.floor(quantity);
+        
+        // 确保数量在允许范围内
+        quantity = Math.max(quantity, minSize);
+        quantity = Math.min(quantity, maxSize);
+        
+        // 计算实际使用的保证金
+        actualMargin = (quantity * quantoMultiplier * currentPrice) / leverage;
+        
+        logger.info(`开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${quantity}张 (杠杆${leverage}x, 保证金${actualMargin.toFixed(2)} USDT)`);
+      }
       
       let size = side === "long" ? quantity : -quantity;
       
       // 最后验证：如果 size 为 0 或者太小，放弃开仓
       if (Math.abs(size) < minSize) {
-        const minMargin = (minSize * quantoMultiplier * currentPrice) / leverage;
+        const minMargin = exchangeType === 'binance' 
+          ? (minSize * currentPrice) / leverage
+          : (minSize * Number.parseFloat(contractInfo.quantoMultiplier || "0.01") * currentPrice) / leverage;
         return {
           success: false,
-          message: `计算的数量 ${Math.abs(size)} 张小于最小限制 ${minSize} 张，需要至少 ${minMargin.toFixed(2)} USDT 保证金（当前${adjustedAmountUsdt.toFixed(2)} USDT，杠杆${leverage}x）`,
+          message: `计算的数量 ${Math.abs(size).toFixed(6)} 小于最小限制 ${minSize}，需要至少 ${minMargin.toFixed(2)} USDT 保证金（当前${adjustedAmountUsdt.toFixed(2)} USDT，杠杆${leverage}x）`,
         };
       }
-      
-      // 计算实际使用的保证金
-      let actualMargin = (Math.abs(size) * quantoMultiplier * currentPrice) / leverage;
-      
-      logger.info(`开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${Math.abs(size)}张 (杠杆${leverage}x)`);
       
       //  市价单开仓（不设置止盈止损）
       const order = await client.placeOrder({
@@ -228,9 +280,19 @@ export const openPositionTool = createTool({
         
         while (retryCount < maxRetries) {
           try {
-            const orderDetail = await client.getOrder(order.id.toString());
+            const orderDetail = await client.getOrder(order.id.toString(), contract);
             finalOrderStatus = orderDetail.status;
-            actualFillSize = Math.abs(Number.parseInt(orderDetail.size || "0") - Number.parseInt(orderDetail.left || "0"));
+            
+            // 根据交易所类型计算成交数量
+            if (exchangeType === 'binance') {
+              // 币安：size 是浮点数（币种数量）
+              const totalSize = Math.abs(Number.parseFloat(orderDetail.size || "0"));
+              const leftSize = Math.abs(Number.parseFloat(orderDetail.left || "0"));
+              actualFillSize = totalSize - leftSize;
+            } else {
+              // Gate.io: size 是整数（张数）
+              actualFillSize = Math.abs(Number.parseInt(orderDetail.size || "0") - Number.parseInt(orderDetail.left || "0"));
+            }
             
             //  获取实际成交价格（fill_price 或 average price）
             if (orderDetail.fill_price && Number.parseFloat(orderDetail.fill_price) > 0) {
@@ -239,7 +301,7 @@ export const openPositionTool = createTool({
               actualFillPrice = Number.parseFloat(orderDetail.price);
             }
             
-            logger.info(`成交: ${actualFillSize}张 @ ${actualFillPrice.toFixed(2)} USDT`);
+            logger.info(`成交: ${actualFillSize.toFixed(exchangeType === 'binance' ? 3 : 0)}${exchangeType === 'binance' ? ` ${symbol}` : '张'} @ ${actualFillPrice.toFixed(2)} USDT`);
             
             //  验证成交价格的合理性（滑点保护）
             const priceDeviation = Math.abs(actualFillPrice - currentPrice) / currentPrice;
@@ -296,11 +358,17 @@ export const openPositionTool = createTool({
       //  使用实际成交数量和价格记录到数据库
       const finalQuantity = actualFillSize > 0 ? actualFillSize : Math.abs(size);
       
-      // 计算手续费（Gate.io taker费率 0.05%）
-      // 手续费 = 合约名义价值 * 0.05%
-      // 合约名义价值 = 张数 * quantoMultiplier * 价格
-      const positionValue = finalQuantity * quantoMultiplier * actualFillPrice;
-      const fee = positionValue * 0.0005; // 0.05%
+      // 计算手续费和名义价值（根据交易所类型）
+      let positionValue: number;
+      if (exchangeType === 'binance') {
+        // 币安：名义价值 = 数量 × 价格
+        positionValue = finalQuantity * actualFillPrice;
+      } else {
+        // Gate.io: 名义价值 = 张数 × quantoMultiplier × 价格
+        const quantoMultiplier = Number.parseFloat(contractInfo.quantoMultiplier || "0.01");
+        positionValue = finalQuantity * quantoMultiplier * actualFillPrice;
+      }
+      const fee = positionValue * 0.0005; // taker费率 0.05%
       
       // 记录开仓交易
       // side: 持仓方向（long=做多, short=做空）
@@ -329,10 +397,10 @@ export const openPositionTool = createTool({
       let slOrderId: string | undefined;
       let tpOrderId: string | undefined;
       
-      //  获取持仓信息以获取 Gate.io 返回的强平价
-      // Gate.io API 有延迟，需要等待并重试
+      //  获取持仓信息以获取交易所返回的强平价
+      // API 有延迟，需要等待并重试
       let liquidationPrice = 0;
-      let gatePositionSize = 0;
+      let exchangePositionSize = 0;
       let maxRetries = 5;
       let retryCount = 0;
       
@@ -342,13 +410,17 @@ export const openPositionTool = createTool({
           
           const positions = await client.getPositions();
           
-          const gatePosition = positions.find((p: any) => p.contract === contract);
-          if (gatePosition) {
-            gatePositionSize = Number.parseInt(gatePosition.size || "0");
+          const position = positions.find((p: any) => p.contract === contract || p.contract === contract.replace("_", ""));
+          if (position) {
+            exchangePositionSize = exchangeType === 'binance' 
+              ? Number.parseFloat(position.size || "0")
+              : Number.parseInt(position.size || "0");
             
-            if (gatePositionSize !== 0) {
-              if (gatePosition.liq_price) {
-                liquidationPrice = Number.parseFloat(gatePosition.liq_price);
+            if (exchangePositionSize !== 0) {
+              if (position.liq_price) {
+                liquidationPrice = Number.parseFloat(position.liq_price);
+              } else if (position.liquidationPrice) {
+                liquidationPrice = Number.parseFloat(position.liquidationPrice);
               }
               break; // 持仓已存在，跳出循环
             }
@@ -357,9 +429,9 @@ export const openPositionTool = createTool({
           retryCount++;
           
           if (retryCount >= maxRetries) {
-            logger.error(`❌ 警告：Gate.io 查询显示持仓为0，但订单状态为 ${finalOrderStatus}`);
+            logger.error(`❌ 警告：交易所查询显示持仓为0，但订单状态为 ${finalOrderStatus}`);
             logger.error(`订单ID: ${order.id}, 成交数量: ${actualFillSize}, 计算数量: ${finalQuantity}`);
-            logger.error(`可能原因：Gate.io API 延迟或持仓需要更长时间更新`);
+            logger.error(`可能原因：交易所 API 延迟或持仓需要更长时间更新`);
           }
         } catch (error) {
           logger.warn(`获取持仓失败（重试${retryCount + 1}/${maxRetries}）: ${error}`);
@@ -367,7 +439,7 @@ export const openPositionTool = createTool({
         }
       }
       
-      // 如果未能从 Gate.io 获取强平价，使用估算公式（仅作为后备）
+      // 如果未能从交易所获取强平价，使用估算公式（仅作为后备）
       if (liquidationPrice === 0) {
         liquidationPrice = side === "long" 
           ? actualFillPrice * (1 - 0.9 / leverage)
@@ -431,20 +503,34 @@ export const openPositionTool = createTool({
         });
       }
       
-      const contractAmount = Math.abs(size) * quantoMultiplier;
-      const totalValue = contractAmount * actualFillPrice;
+      // 计算实际的币种数量和名义价值
+      let contractAmount: number;
+      let totalValue: number;
+      
+      if (exchangeType === 'binance') {
+        // 币安：数量就是币种数量
+        contractAmount = Math.abs(size);
+        totalValue = contractAmount * actualFillPrice;
+      } else {
+        // Gate.io: 数量是张数，需要转换为币种数量
+        const quantoMultiplier = Number.parseFloat(contractInfo.quantoMultiplier || "0.01");
+        contractAmount = Math.abs(size) * quantoMultiplier;
+        totalValue = contractAmount * actualFillPrice;
+      }
       
       return {
         success: true,
         orderId: order.id?.toString(),
         symbol,
         side,
-        size: Math.abs(size), // 合约张数
-        contractAmount, // 实际币的数量
+        size: Math.abs(size),
+        contractAmount,
         price: actualFillPrice,
         leverage,
         actualMargin,
-        message: `✅ 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${Math.abs(size)} 张 (${contractAmount.toFixed(4)} ${symbol})，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。⚠️ 未设置止盈止损，请在每个周期主动决策是否平仓。`,
+        message: exchangeType === 'binance' 
+          ? `✅ 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${contractAmount.toFixed(3)} ${symbol}，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。⚠️ 未设置止盈止损，请在每个周期主动决策是否平仓。`
+          : `✅ 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${Math.abs(size)} 张 (${contractAmount.toFixed(4)} ${symbol})，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。⚠️ 未设置止盈止损，请在每个周期主动决策是否平仓。`,
       };
     } catch (error: any) {
       return {
@@ -467,8 +553,8 @@ export const closePositionTool = createTool({
     percentage: z.number().min(1).max(100).default(100).describe("平仓百分比（1-100）"),
   }),
   execute: async ({ symbol, percentage }) => {
-    const client = createGateClient();
-    const contract = `${symbol}_USDT`;
+    const client = createTradingClient();
+    const contract = formatContract(symbol);
     
     try {
       //  参数验证
@@ -793,7 +879,7 @@ export const cancelOrderTool = createTool({
     orderId: z.string().describe("订单ID"),
   }),
   execute: async ({ orderId }) => {
-    const client = createGateClient();
+    const client = createTradingClient();
     
     try {
       await client.cancelOrder(orderId);

@@ -92,7 +92,7 @@ async function main() {
   logger.info(`支持币种: ${RISK_PARAMS.TRADING_SYMBOLS.join(', ')}`);
   logger.info(`最大杠杆: ${RISK_PARAMS.MAX_LEVERAGE}x`);
   logger.info(`最大持仓数: ${RISK_PARAMS.MAX_POSITIONS}`);
-  logger.info(`\n🔴 账户止损线: ${process.env.ACCOUNT_STOP_LOSS_USDT || 50} USDT (触发后全部清仓并退出)`);
+  logger.info(`🔴 账户止损线: ${process.env.ACCOUNT_STOP_LOSS_USDT || 50} USDT (触发后全部清仓并退出)`);
   logger.info(`🟢 账户止盈线: ${process.env.ACCOUNT_TAKE_PROFIT_USDT || 10000} USDT (触发后全部清仓并退出)`);
   logger.info("\n按 Ctrl+C 停止系统\n");
 }

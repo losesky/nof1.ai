@@ -23,7 +23,7 @@
 import cron from "node-cron";
 import { createPinoLogger } from "@voltagent/logger";
 import { createClient } from "@libsql/client";
-import { createGateClient } from "../services/gateClient";
+import { createTradingClient } from "../services/tradingClientFactory";
 import { getChinaTimeISO } from "../utils/timeUtils";
 
 const logger = createPinoLogger({
@@ -41,10 +41,10 @@ const dbClient = createClient({
  */
 async function recordAccountAssets() {
   try {
-    const gateClient = createGateClient();
+    const tradingClient = createTradingClient();
     
-    // Get account information from Gate.io
-    const account = await gateClient.getFuturesAccount();
+    // 获取账户信息
+    const account = await tradingClient.getFuturesAccount();
     
     // Extract account data
     const accountTotal = Number.parseFloat(account.total || "0");

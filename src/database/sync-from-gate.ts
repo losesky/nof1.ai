@@ -51,7 +51,7 @@ async function syncFromGate() {
     
     // 2. 获取持仓信息
     const positions = await gateClient.getPositions();
-    const activePositions = positions.filter(p => Number.parseInt(p.size || "0") !== 0);
+    const activePositions = positions.filter((p: any) => Number.parseInt(p.size || "0") !== 0);
     logger.info(`   当前持仓数: ${activePositions.length}`);
     
     if (activePositions.length > 0) {
@@ -186,7 +186,7 @@ async function syncFromGate() {
       fs.writeFileSync(envPath, envContent, "utf-8");
       logger.info(`✅ .env 文件已更新`);
     } catch (error) {
-      logger.warn(`⚠️  更新 .env 文件失败:`, error);
+      logger.warn(`⚠️  更新 .env 文件失败:`, error as any);
       logger.warn(`   请手动设置 INITIAL_BALANCE=${currentBalance.toFixed(2)}`);
     }
     

@@ -39,8 +39,9 @@ if [ ! -f .env ]; then
     echo -e "${RED}❌ 错误: .env 文件不存在${NC}"
     echo ""
     echo "请先创建 .env 文件并配置必要的环境变量："
-    echo "  - GATE_API_KEY"
-    echo "  - GATE_API_SECRET"
+    echo "  - EXCHANGE_TYPE (binance 或 gate)"
+    echo "  - BINANCE_API_KEY 和 BINANCE_API_SECRET (如果使用币安)"
+    echo "  - GATE_API_KEY 和 GATE_API_SECRET (如果使用 Gate.io)"
     echo "  - OPENROUTER_API_KEY"
     echo "  - INITIAL_BALANCE"
     echo "  - DATABASE_URL"
@@ -57,12 +58,26 @@ source .env
 # 检查必需的环境变量
 MISSING_VARS=()
 
-if [ -z "$GATE_API_KEY" ]; then
-    MISSING_VARS+=("GATE_API_KEY")
-fi
-
-if [ -z "$GATE_API_SECRET" ]; then
-    MISSING_VARS+=("GATE_API_SECRET")
+# 检查交易所类型
+if [ -z "$EXCHANGE_TYPE" ]; then
+    MISSING_VARS+=("EXCHANGE_TYPE")
+elif [ "$EXCHANGE_TYPE" = "gate" ]; then
+    if [ -z "$GATE_API_KEY" ]; then
+        MISSING_VARS+=("GATE_API_KEY")
+    fi
+    if [ -z "$GATE_API_SECRET" ]; then
+        MISSING_VARS+=("GATE_API_SECRET")
+    fi
+elif [ "$EXCHANGE_TYPE" = "binance" ]; then
+    if [ -z "$BINANCE_API_KEY" ]; then
+        MISSING_VARS+=("BINANCE_API_KEY")
+    fi
+    if [ -z "$BINANCE_API_SECRET" ]; then
+        MISSING_VARS+=("BINANCE_API_SECRET")
+    fi
+else
+    echo -e "${RED}❌ 错误: EXCHANGE_TYPE 必须是 'binance' 或 'gate'${NC}"
+    exit 1
 fi
 
 if [ -z "$OPENROUTER_API_KEY" ]; then
@@ -103,7 +118,11 @@ echo "  配置信息"
 echo "=================================================="
 echo -e "${BLUE}数据库 URL:${NC} $DATABASE_URL"
 echo -e "${BLUE}初始资金:${NC} $INITIAL_BALANCE USDT"
-echo -e "${BLUE}测试网模式:${NC} ${GATE_USE_TESTNET:-false}"
+if [ "$EXCHANGE_TYPE" = "binance" ]; then
+    echo -e "${BLUE}测试网模式:${NC} ${BINANCE_USE_TESTNET:-false}"
+else
+    echo -e "${BLUE}测试网模式:${NC} ${GATE_USE_TESTNET:-false}"
+fi
 echo -e "${BLUE}交易间隔:${NC} ${TRADING_INTERVAL_MINUTES:-5} 分钟"
 echo -e "${BLUE}最大杠杆:${NC} ${MAX_LEVERAGE:-10}x"
 echo ""

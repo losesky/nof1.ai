@@ -7,6 +7,7 @@
 
 [![VoltAgent](https://img.shields.io/badge/Framework-VoltAgent-purple.svg)](https://voltagent.dev)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter-orange.svg)](https://openrouter.ai)
+[![币安](https://img.shields.io/badge/Exchange-Binance-F0B90B.svg)](https://www.binance.com)
 [![Gate.io](https://img.shields.io/badge/Exchange-Gate.io-00D4AA.svg)](https://www.gate.io)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Node.js](https://img.shields.io/badge/Runtime-Node.js%2020+-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -162,8 +163,8 @@ npm install
 在项目根目录创建 `.env` 文件:
 
 ```env
-# 服务器配置
-PORT=3100
+# 交易所类型 (binance 或 gate)
+EXCHANGE_TYPE=binance
 
 # 交易参数
 TRADING_INTERVAL_MINUTES=5      # 交易循环间隔
@@ -173,7 +174,12 @@ INITIAL_BALANCE=2000            # 初始资金(USDT)
 # 数据库
 DATABASE_URL=file:./.voltagent/trading.db
 
-# Gate.io API 凭证(建议先使用测试网!)
+# 币安 API 凭证(建议先使用测试网!)
+BINANCE_API_KEY=your_api_key_here
+BINANCE_API_SECRET=your_api_secret_here
+BINANCE_USE_TESTNET=true
+
+# Gate.io API 凭证(可选，仅在EXCHANGE_TYPE=gate时使用)
 GATE_API_KEY=your_api_key_here
 GATE_API_SECRET=your_api_secret_here
 GATE_USE_TESTNET=true
@@ -183,9 +189,12 @@ OPENROUTER_API_KEY=your_openrouter_key_here
 ```
 
 **API 密钥获取**:
-- OpenRouter: https://openrouter.ai/keys
-- Gate.io 测试网: https://www.gate.io/testnet
-- Gate.io 正式网: https://www.gate.io/myaccount/api_key_manage
+
+- OpenRouter: <https://openrouter.ai/keys>
+- 币安测试网: <https://testnet.binance.vision/>
+- 币安正式网: <https://www.binance.com/zh-CN/my/settings/api-management>
+- Gate.io 测试网: <https://www.gate.io/testnet>
+- Gate.io 正式网: <https://www.gate.io/myaccount/api_key_manage>
 
 ### 数据库初始化
 
@@ -276,6 +285,7 @@ open-nof1.ai/
 默认模型: `deepseek/deepseek-v3.2-exp`
 
 可通过 OpenRouter 使用的替代模型:
+
 - `openai/gpt-4o-mini` - 性价比高
 - `openai/gpt-4o` - 高质量推理
 - `anthropic/claude-3.5-sonnet` - 强大的分析能力
@@ -496,6 +506,7 @@ docker compose down
 **错误**: `database is locked`
 
 **解决方案**:
+
 ```bash
 # 停止所有运行实例
 npm run trading:stop
@@ -515,6 +526,7 @@ npm run trading:start
 **错误**: `GATE_API_KEY and GATE_API_SECRET must be set in environment variables`
 
 **解决方案**:
+
 ```bash
 # 验证 .env 文件
 cat .env | grep GATE_API
@@ -528,6 +540,7 @@ nano .env
 **错误**: `EADDRINUSE: address already in use :::3100`
 
 **解决方案**:
+
 ```bash
 # 方法 1: 使用停止脚本
 npm run trading:stop
@@ -544,6 +557,7 @@ lsof -ti:3100 | xargs kill -9
 **原因**: K线数据格式不匹配
 
 **解决方案**:
+
 ```bash
 # 拉取最新更新
 git pull
@@ -560,6 +574,7 @@ npm run trading:restart
 **错误**: `OpenRouter API error`
 
 **解决方案**:
+
 - 验证 `OPENROUTER_API_KEY` 是否正确
 - 确保 API 密钥有足够额度
 - 检查网络连接
@@ -612,6 +627,7 @@ SELECT * FROM account_history ORDER BY timestamp DESC LIMIT 10;
 ### WebSocket 支持
 
 实时数据流支持:
+
 - 账户更新
 - 持仓变化
 - 新交易执行
@@ -629,6 +645,7 @@ GATE_USE_TESTNET=true
 ```
 
 测试网优势:
+
 - 使用虚拟资金零金融风险
 - 完整模拟真实交易环境
 - 验证 AI 策略有效性
@@ -637,6 +654,7 @@ GATE_USE_TESTNET=true
 ### 资金管理
 
 切换到正式网时:
+
 - 使用最小资金启动(建议: 100-500 USDT)
 - 监控几天的表现
 - 根据验证结果逐步扩大资金规模
@@ -731,6 +749,7 @@ npm run trading:start
 ### 为什么选择 AGPL-3.0?
 
 我们选择 AGPL-3.0 以确保:
+
 - 交易社区从所有改进中受益
 - 金融软件的透明度
 - 防止专有分支
@@ -776,6 +795,7 @@ npm run trading:start
 ```
 
 类型:
+
 - `feat`: 新功能
 - `fix`: Bug 修复
 - `docs`: 文档变更

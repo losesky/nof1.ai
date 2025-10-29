@@ -39,13 +39,42 @@ fi
 
 # 检查必需的环境变量
 echo "🔍 检查环境变量配置..."
-if ! grep -q "GATE_API_KEY=your_api_key_here" .env && \
-   ! grep -q "OPENROUTER_API_KEY=your_openrouter_key_here" .env; then
+
+# 检查是否仍然使用默认值
+DEFAULT_VALUES_FOUND=false
+
+# 检查交易所类型
+if ! grep -q "EXCHANGE_TYPE=" .env; then
+    echo "⚠️  警告: 未配置 EXCHANGE_TYPE"
+    DEFAULT_VALUES_FOUND=true
+else
+    source .env
+    if [ "$EXCHANGE_TYPE" = "gate" ] && grep -q "GATE_API_KEY=your_api_key_here" .env; then
+        echo "⚠️  警告: Gate.io API 密钥使用默认值"
+        DEFAULT_VALUES_FOUND=true
+    elif [ "$EXCHANGE_TYPE" = "binance" ] && grep -q "BINANCE_API_KEY=your_binance_key_here" .env; then
+        echo "⚠️  警告: 币安 API 密钥使用默认值"
+        DEFAULT_VALUES_FOUND=true
+    fi
+fi
+
+if grep -q "OPENROUTER_API_KEY=your__key_here" .env; then
+    echo "⚠️  警告: DEEPSEEK API 密钥使用默认值"
+    DEFAULT_VALUES_FOUND=true
+fi
+
+if [ "$DEFAULT_VALUES_FOUND" = false ]; then
     echo "✅ 环境变量已配置"
 else
     echo "⚠️  警告: 请确保已正确配置以下环境变量:"
-    echo "   - GATE_API_KEY"
-    echo "   - GATE_API_SECRET"
+    echo "   - EXCHANGE_TYPE (binance 或 gate)"
+    if [ "$EXCHANGE_TYPE" = "gate" ]; then
+        echo "   - GATE_API_KEY"
+        echo "   - GATE_API_SECRET"
+    elif [ "$EXCHANGE_TYPE" = "binance" ]; then
+        echo "   - BINANCE_API_KEY"
+        echo "   - BINANCE_API_SECRET"
+    fi
     echo "   - OPENROUTER_API_KEY"
     echo ""
     read -p "是否继续? (y/N) " -n 1 -r

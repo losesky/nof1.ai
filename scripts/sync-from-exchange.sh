@@ -17,13 +17,24 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # =====================================================
-# 从 Gate.io 同步账户并重置数据库
+# 从交易所同步账户并重置数据库
 # =====================================================
 
 set -e
 
+# 读取环境变量
+source .env
+
+# 根据 EXCHANGE_TYPE 设置显示名称
+EXCHANGE_NAME="未知交易所"
+if [ "$EXCHANGE_TYPE" = "gate" ]; then
+    EXCHANGE_NAME="Gate.io"
+elif [ "$EXCHANGE_TYPE" = "binance" ]; then
+    EXCHANGE_NAME="币安"
+fi
+
 echo "=================================================="
-echo "  从 Gate.io 同步账户资金"
+echo "  从 ${EXCHANGE_NAME} 同步账户资金"
 echo "=================================================="
 echo ""
 
