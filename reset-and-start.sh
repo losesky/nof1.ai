@@ -115,15 +115,15 @@ echo ""
 if [ ! -f ".env" ]; then
     echo -e "${RED}❌ 未找到 .env 文件${NC}"
     echo "请创建 .env 文件并配置以下变量："
-    echo "  - GATE_API_KEY"
-    echo "  - GATE_API_SECRET"
-    echo "  - OPENROUTER_API_KEY"
-    echo "  - GATE_USE_TESTNET=true"
+    echo "  - BINANCE_API_KEY"
+    echo "  - BINANCE_API_SECRET"
+    echo "  - DEEPSEEK_API_KEY"
+    echo "  - BINANCE_USE_TESTNET=true"
     exit 1
 fi
 
 # 检查必需的环境变量
-REQUIRED_VARS=("GATE_API_KEY" "GATE_API_SECRET" "OPENROUTER_API_KEY")
+REQUIRED_VARS=("BINANCE_API_KEY" "BINANCE_API_SECRET" "DEEPSEEK_API_KEY")
 MISSING_VARS=()
 
 for var in "${REQUIRED_VARS[@]}"; do
@@ -145,7 +145,7 @@ fi
 echo -e "${GREEN}✓${NC} 配置文件检查通过"
 
 # 检查是否使用测试网
-if grep -q "GATE_USE_TESTNET=true" .env; then
+if grep -q "BINANCE_USE_TESTNET=true" .env; then
     echo -e "${GREEN}✓${NC} 当前配置: 测试网模式（推荐）"
 else
     echo -e "${YELLOW}⚠${NC} 当前配置: 正式网模式"
@@ -160,7 +160,7 @@ npm run db:init
 echo ""
 
 # 步骤 7：同步持仓数据
-echo "🔄 步骤 7/8：从 Gate.io 同步持仓数据..."
+echo "🔄 步骤 7/8：从 EXCHANGE 同步持仓数据..."
 echo ""
 
 npm run db:sync-positions

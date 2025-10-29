@@ -42,7 +42,7 @@ if [ ! -f .env ]; then
     echo "  - EXCHANGE_TYPE (binance 或 gate)"
     echo "  - BINANCE_API_KEY 和 BINANCE_API_SECRET (如果使用币安)"
     echo "  - GATE_API_KEY 和 GATE_API_SECRET (如果使用 Gate.io)"
-    echo "  - OPENROUTER_API_KEY"
+    echo "  - DEEPSEEK_API_KEY"
     echo "  - INITIAL_BALANCE"
     echo "  - DATABASE_URL"
     echo ""
@@ -80,8 +80,8 @@ else
     exit 1
 fi
 
-if [ -z "$OPENROUTER_API_KEY" ]; then
-    MISSING_VARS+=("OPENROUTER_API_KEY")
+if [ -z "$DEEPSEEK_API_KEY" ]; then
+    MISSING_VARS+=("DEEPSEEK_API_KEY")
 fi
 
 if [ ${#MISSING_VARS[@]} -ne 0 ]; then

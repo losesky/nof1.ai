@@ -79,9 +79,9 @@ if [ -z "$SKIP_ENV" ]; then
     # Gate.io API Key
     read -p "Gate.io API Key: " GATE_API_KEY
     read -p "Gate.io API Secret: " GATE_API_SECRET
-    
-    # OpenRouter API Key
-    read -p "OpenRouter API Key: " OPENROUTER_API_KEY
+
+    # Deepseek API Key
+    read -p "Deepseek API Key: " DEEPSEEK_API_KEY
     
     # 初始资金
     read -p "初始资金 (USDT) [默认: 1000]: " INITIAL_BALANCE
@@ -140,7 +140,7 @@ GATE_USE_TESTNET=$GATE_USE_TESTNET
 # ============================================
 # AI 模型配置
 # ============================================
-OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY
 EOF
     
     echo -e "${GREEN}✅ .env 文件创建成功${NC}"

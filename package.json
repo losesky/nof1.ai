@@ -68,6 +68,7 @@
     "docker:prod:down": "docker compose -f docker-compose.prod.yml down"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.56",
     "@openrouter/ai-sdk-provider": "^1.2.0",
     "@voltagent/cli": "^0.1.10",
     "@voltagent/core": "^1.0.0",

@@ -58,7 +58,7 @@ else
     fi
 fi
 
-if grep -q "OPENROUTER_API_KEY=your__key_here" .env; then
+if grep -q "BINANCE_API_KEY=your__key_here" .env; then
     echo "⚠️  警告: DEEPSEEK API 密钥使用默认值"
     DEFAULT_VALUES_FOUND=true
 fi
@@ -75,7 +75,7 @@ else
         echo "   - BINANCE_API_KEY"
         echo "   - BINANCE_API_SECRET"
     fi
-    echo "   - OPENROUTER_API_KEY"
+    echo "   - BINANCE_API_KEY"
     echo ""
     read -p "是否继续? (y/N) " -n 1 -r
     echo

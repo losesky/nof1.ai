@@ -1,20 +1,5 @@
 # open-nof1.ai
 
-<div align="center">
-
-[![简体中文](https://img.shields.io/badge/语言-简体中文-red.svg)](./README.md)
-[![English](https://img.shields.io/badge/Language-English-blue.svg)](./README_EN.md)
-
-[![VoltAgent](https://img.shields.io/badge/Framework-VoltAgent-purple.svg)](https://voltagent.dev)
-[![OpenRouter](https://img.shields.io/badge/AI-OpenRouter-orange.svg)](https://openrouter.ai)
-[![币安](https://img.shields.io/badge/Exchange-Binance-F0B90B.svg)](https://www.binance.com)
-[![Gate.io](https://img.shields.io/badge/Exchange-Gate.io-00D4AA.svg)](https://www.gate.io)
-[![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Node.js](https://img.shields.io/badge/Runtime-Node.js%2020+-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](./LICENSE)
-
-</div>
-
 ## 系统概述
 
 open-nof1.ai 是一个 AI 驱动的加密货币自动交易系统，将大语言模型智能与量化交易实践深度融合。系统基于 Agent 框架构建，通过赋予 AI 完全的市场分析和交易决策自主权，实现真正的智能化交易。
@@ -34,14 +19,13 @@ open-nof1.ai 是一个 AI 驱动的加密货币自动交易系统，将大语言
 - [命令参考](#命令参考)
 - [生产部署](#生产部署)
 - [故障排查](#故障排查)
-- [开发指南](#开发指南)
 - [API 文档](#api-文档)
 - [参与贡献](#参与贡献)
 - [开源协议](#开源协议)
 
 ## 系统架构
 
-```
+```chat
 ┌─────────────────────────────────────────────────────────┐
 │                   Trading Agent (AI)                    │
 │              (DeepSeek V3.2 / Gork4 / Claude)           │
@@ -78,7 +62,7 @@ open-nof1.ai 是一个 AI 驱动的加密货币自动交易系统，将大语言
 | 组件 | 技术 | 用途 |
 |------|------|------|
 | 框架 | [VoltAgent](https://voltagent.dev) | AI Agent 编排与管理 |
-| AI 提供商 | [OpenRouter](https://openrouter.ai) | 统一 LLM API 访问 (DeepSeek V3.2, GPT-4, Claude 等) |
+| AI 提供商 | [DeepSeek 官方](https://platform.deepseek.com) (推荐) / [OpenRouter](https://openrouter.ai) | DeepSeek V3 直连(节省90%成本) 或 统一 LLM 访问 |
 | 交易所 | [Gate.io](https://www.gate.io) | 加密货币交易(测试网 & 正式网) |
 | 数据库 | LibSQL (SQLite) | 本地数据持久化 |
 | Web 服务器 | Hono | 高性能 HTTP 框架 |
@@ -184,17 +168,22 @@ GATE_API_KEY=your_api_key_here
 GATE_API_SECRET=your_api_secret_here
 GATE_USE_TESTNET=true
 
-# AI 模型提供商
-OPENROUTER_API_KEY=your_openrouter_key_here
+# AI 模型提供商（推荐使用 DeepSeek 官方，节省 90% 成本）
+USE_DEEPSEEK_DIRECT=true
+DEEPSEEK_API_KEY=your_deepseek_key_here
+# OPENROUTER_API_KEY=your_openrouter_key_here  # 可选：作为备用
 ```
 
 **API 密钥获取**:
 
+- **DeepSeek 官方 (推荐)**: <https://platform.deepseek.com/api_keys> - 费用仅为 OpenRouter 的 6-8%
 - OpenRouter: <https://openrouter.ai/keys>
 - 币安测试网: <https://testnet.binance.vision/>
 - 币安正式网: <https://www.binance.com/zh-CN/my/settings/api-management>
 - Gate.io 测试网: <https://www.gate.io/testnet>
 - Gate.io 正式网: <https://www.gate.io/myaccount/api_key_manage>
+
+> 💡 **成本优化提示**: 强烈建议使用 DeepSeek 官方 API！相同质量下费用仅为 OpenRouter 的 6-8%。详见 [DeepSeek 迁移指南](./DEEPSEEK_MIGRATION_GUIDE.md)
 
 ### 数据库初始化
 
@@ -218,7 +207,7 @@ npm run trading:start
 
 ## 项目结构
 
-```
+```bash
 open-nof1.ai/
 ├── src/
 │   ├── index.ts                      # 应用入口
@@ -278,14 +267,30 @@ open-nof1.ai/
 | `GATE_API_KEY` | Gate.io API 密钥 | - | 是 |
 | `GATE_API_SECRET` | Gate.io API 密钥 | - | 是 |
 | `GATE_USE_TESTNET` | 使用测试网环境 | true | 否 |
-| `OPENROUTER_API_KEY` | OpenRouter API 密钥 | - | 是 |
+| `USE_DEEPSEEK_DIRECT` | 使用 DeepSeek 官方 API (推荐) | false | 否 |
+| `DEEPSEEK_API_KEY` | DeepSeek 官方 API 密钥 (推荐) | - | 条件必需* |
+| `OPENROUTER_API_KEY` | OpenRouter API 密钥 | - | 条件必需* |
+
+\* 至少需要配置 `DEEPSEEK_API_KEY` 或 `OPENROUTER_API_KEY` 之一
 
 ### AI 模型配置
 
-默认模型: `deepseek/deepseek-v3.2-exp`
+**推荐配置（节省 90% 成本）**：
 
-可通过 OpenRouter 使用的替代模型:
+```bash
+USE_DEEPSEEK_DIRECT=true
+DEEPSEEK_API_KEY=sk-your-key
+AI_MODEL_NAME=deepseek-chat  # DeepSeek 官方模型名
+```
 
+**使用 DeepSeek 官方时的可选模型**：
+
+- `deepseek-chat` - DeepSeek V3 主模型（推荐，默认）
+- `deepseek-coder` - 代码专用模型
+
+**使用 OpenRouter 时的可选模型**：
+
+- `deepseek/deepseek-v3.2-exp` - DeepSeek V3.2 实验版（默认）
 - `openai/gpt-4o-mini` - 性价比高
 - `openai/gpt-4o` - 高质量推理
 - `anthropic/claude-3.5-sonnet` - 强大的分析能力
@@ -786,7 +791,7 @@ npm run trading:start
 
 遵循 Conventional Commits 规范:
 
-```
+```chat
 <类型>[可选 范围]: <描述>
 
 [可选 正文]

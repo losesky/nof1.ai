@@ -26,6 +26,7 @@ import * as tradingTools from "../tools/trading";
 import { formatChinaTime } from "../utils/timeUtils";
 import { RISK_PARAMS } from "../config/riskParams";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 
 /**
  * 账户风险配置
@@ -51,6 +52,39 @@ const logger = createPinoLogger({
   name: "trading-agent",
   level: "info",
 });
+
+/**
+ * 创建 AI 提供商
+ * 优先使用 DeepSeek 官方 API（更便宜），否则使用 OpenRouter
+ */
+function createAIProvider() {
+  const useDeepSeek = process.env.USE_DEEPSEEK_DIRECT === "true";
+  const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+  const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+  
+  // 优先使用 DeepSeek 官方 API
+  if (useDeepSeek && deepseekApiKey) {
+    logger.info("使用 DeepSeek 官方 API（节省成本）");
+    const deepseek = createOpenAI({
+      apiKey: deepseekApiKey,
+      baseURL: "https://api.deepseek.com/v1",
+    });
+    const modelName = process.env.AI_MODEL_NAME || "deepseek-chat";
+    return deepseek.chat(modelName);
+  }
+  
+  // 回退到 OpenRouter
+  if (openrouterApiKey) {
+    logger.info("使用 OpenRouter API");
+    const openrouter = createOpenRouter({
+      apiKey: openrouterApiKey,
+    });
+    const modelName = process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp";
+    return openrouter.chat(modelName);
+  }
+  
+  throw new Error("未配置 AI API 密钥。请设置 DEEPSEEK_API_KEY 或 OPENROUTER_API_KEY");
+}
 
 /**
  * 生成交易提示词（参照 1.md 格式）
@@ -485,7 +519,6 @@ export function createTradingAgent() {
    c) **峰值回撤保护**：
       - 记录每个持仓的历史最高 pnl_percent（峰值盈利）
       - 如果当前盈利回撤超过峰值的30%，立即平仓
-      - 例如：峰值+20%，当前+14%，回撤=(20-14)/20=30%，触发平仓
    
    d) **持仓时间检查**：
       - 如果持仓时间≥36小时（216个周期），无论盈亏立即平仓
@@ -569,7 +602,7 @@ export function createTradingAgent() {
   * 这个设计让您更容易理解实际盈亏：+10% 就是保证金增值10%，-10% 就是保证金亏损10%
 
 市场数据按时间顺序排列（最旧 → 最新），跨多个时间框架（15分钟、30分钟、1小时、4小时）。使用此数据识别多时间框架趋势和关键水平。`,
-    model: openrouter.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
+    model: createAIProvider(),
     tools: [
       tradingTools.getMarketPriceTool,
       tradingTools.getTechnicalIndicatorsTool,
