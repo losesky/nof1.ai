@@ -30,7 +30,7 @@ process.env.TZ = 'Asia/Shanghai';
 
 // 创建日志实例（使用中国时区）
 const logger = createPinoLogger({
-  name: "ai-btc",
+  name: "ai-trading",
   level: "info",
   formatters: {
     timestamp: () => {

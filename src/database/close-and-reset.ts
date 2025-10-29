@@ -23,6 +23,7 @@
 import { createClient } from "@libsql/client";
 import { createPinoLogger } from "@voltagent/logger";
 import { createTradingClient } from "../services/tradingClientFactory";
+import { CREATE_TABLES_SQL } from "./schema";
 import "dotenv/config";
 
 const logger = createPinoLogger({
@@ -32,73 +33,6 @@ const logger = createPinoLogger({
 
 // 获取交易所类型
 const EXCHANGE_TYPE = process.env.EXCHANGE_TYPE || 'binance';
-
-const CREATE_TABLES_SQL = `
-CREATE TABLE IF NOT EXISTS account_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    total_value REAL NOT NULL,
-    available_cash REAL NOT NULL,
-    unrealized_pnl REAL NOT NULL,
-    realized_pnl REAL NOT NULL,
-    return_percent REAL NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS positions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    quantity REAL NOT NULL,
-    entry_price REAL NOT NULL,
-    current_price REAL NOT NULL,
-    liquidation_price REAL NOT NULL,
-    unrealized_pnl REAL NOT NULL,
-    leverage INTEGER NOT NULL,
-    side TEXT NOT NULL,
-    entry_order_id TEXT,
-    opened_at TEXT NOT NULL,
-    closed_at TEXT
-);
-
-CREATE TABLE IF NOT EXISTS trading_signals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    price REAL NOT NULL,
-    ema_20 REAL,
-    ema_50 REAL,
-    macd REAL,
-    rsi_7 REAL,
-    rsi_14 REAL,
-    volume REAL,
-    funding_rate REAL
-);
-
-CREATE TABLE IF NOT EXISTS agent_decisions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    iteration INTEGER NOT NULL,
-    market_analysis TEXT NOT NULL,
-    decision TEXT NOT NULL,
-    actions_taken TEXT NOT NULL,
-    account_value REAL NOT NULL,
-    positions_count INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS trade_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    symbol TEXT NOT NULL,
-    action TEXT NOT NULL,
-    order_id TEXT,
-    price REAL NOT NULL,
-    quantity REAL NOT NULL,
-    amount REAL NOT NULL,
-    leverage INTEGER,
-    pnl REAL,
-    fee REAL,
-    status TEXT NOT NULL
-);
-`;
 
 /**
  * 解析持仓大小（统一处理币安浮点数和Gate.io整数）
