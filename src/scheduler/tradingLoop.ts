@@ -1383,7 +1383,7 @@ async function executeTradingDecision() {
           const contract = `${symbol}_USDT`;
           const size = side === 'long' ? -pos.quantity : pos.quantity;
           
-          await tradingClient.placeOrder({
+          const order = await tradingClient.placeOrder({
             contract,
             size,
             price: 0,
@@ -1391,6 +1391,77 @@ async function executeTradingDecision() {
           });
           
           logger.info(`✅ 已强制平仓 ${symbol}，原因：${closeReason}`);
+          
+          // 等待订单完成并获取实际成交价格
+          let actualExitPrice = currentPrice;
+          let actualCloseSize = Math.abs(pos.quantity);
+          try {
+            // 等待一小段时间让订单成交
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 获取订单详情
+            if (order.id) {
+              const orderDetail = await tradingClient.getOrder(order.id.toString(), contract);
+              if (orderDetail && orderDetail.fill_price) {
+                actualExitPrice = Number.parseFloat(orderDetail.fill_price);
+              }
+              if (orderDetail && orderDetail.size) {
+                actualCloseSize = Math.abs(Number.parseFloat(orderDetail.size));
+              }
+            }
+          } catch (err: any) {
+            logger.warn(`无法获取订单详情，使用当前价格: ${err.message}`);
+          }
+          
+          // 计算盈亏
+          const priceChange = actualExitPrice - entryPrice;
+          const pnlBeforeFee = side === 'long' 
+            ? priceChange * actualCloseSize 
+            : -priceChange * actualCloseSize;
+          
+          // 计算手续费（开仓 + 平仓，假设都是 0.05%）
+          const EXCHANGE_TYPE = process.env.EXCHANGE_TYPE || 'gate';
+          const quantoMultiplier = EXCHANGE_TYPE === 'binance' ? actualExitPrice : 1;
+          
+          const openFee = (actualCloseSize * entryPrice * (EXCHANGE_TYPE === 'binance' ? 1 : quantoMultiplier)) * 0.0005;
+          const closeFee = (actualCloseSize * actualExitPrice * (EXCHANGE_TYPE === 'binance' ? 1 : quantoMultiplier)) * 0.0005;
+          const totalFee = openFee + closeFee;
+          const pnl = pnlBeforeFee - totalFee;
+          
+          // 检查是否存在对应的开仓记录
+          try {
+            const openTradeResult = await dbClient.execute({
+              sql: "SELECT * FROM trades WHERE symbol = ? AND side = ? AND type = 'open' ORDER BY timestamp DESC LIMIT 1",
+              args: [symbol, side],
+            });
+            
+            if (openTradeResult.rows.length === 0) {
+              logger.warn(`⚠️ 未找到 ${symbol} ${side} 的开仓记录，可能需要补录`);
+            }
+          } catch (checkErr: any) {
+            logger.warn(`检查开仓记录失败: ${checkErr.message}`);
+          }
+          
+          // 保存平仓交易记录到数据库
+          await dbClient.execute({
+            sql: `INSERT INTO trades (order_id, symbol, side, type, price, quantity, leverage, pnl, fee, timestamp, status)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              order.id?.toString() || `force_close_${Date.now()}`,
+              symbol,
+              side,
+              "close",
+              actualExitPrice,
+              actualCloseSize,
+              leverage,
+              pnl,
+              totalFee,
+              getChinaTimeISO(),
+              "filled",
+            ],
+          });
+          
+          logger.info(`💾 已保存平仓记录: ${symbol} ${side}, 入场: ${entryPrice.toFixed(2)}, 出场: ${actualExitPrice.toFixed(2)}, 盈亏: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT`);
           
           // 从数据库删除持仓记录
           await dbClient.execute({

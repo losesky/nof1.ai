@@ -153,12 +153,14 @@ export const checkOrderStatusTool = createTool({
   description: "检查指定订单的详细状态，包括成交价格、成交数量等",
   parameters: z.object({
     orderId: z.string().describe("订单ID"),
+    symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
   }),
-  execute: async ({ orderId }) => {
+  execute: async ({ orderId, symbol }) => {
     const client = createTradingClient();
+    const contract = formatContract(symbol);
     
     try {
-      const orderDetail = await client.getOrder(orderId);
+      const orderDetail = await client.getOrder(orderId, contract);
       
       const totalSize = Math.abs(Number.parseInt(orderDetail.size || "0"));
       const leftSize = Math.abs(Number.parseInt(orderDetail.left || "0"));

@@ -241,9 +241,29 @@
 
         <!-- Trades Section -->
         <section class="trades-section">
-            <h2 class="section-header">交易历史 <span id="tradesCount"></span></h2>
-            <div class="trades-container" id="tradesContainer">
-                <p class="loading">加载中...</p>
+            <h2 class="section-header">交易历史 (最近25条) <span id="tradesCount"></span></h2>
+            <div class="trades-container">
+                <table class="trades-table">
+                    <thead>
+                        <tr>
+                            <th>币种</th>
+                            <th>方向</th>
+                            <th>开仓价格</th>
+                            <th>平仓价格</th>
+                            <th>数量</th>
+                            <th>持仓时间</th>
+                            <th>名义开仓</th>
+                            <th>名义平仓</th>
+                            <th>总手续费</th>
+                            <th>净盈亏</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesContainer">
+                        <tr>
+                            <td colspan="10" class="loading">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
   </main>

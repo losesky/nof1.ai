@@ -150,15 +150,15 @@ class TradingMonitor {
             if (positionsBody) {
                 positionsBody.innerHTML = data.positions.map(pos => {
                     const profitPercent = ((pos.unrealizedPnl / pos.openValue) * 100).toFixed(2);
-                    const sideText = pos.side === 'long' ? '做多' : '做空';
-                    const sideClass = pos.side === 'long' ? 'positive' : 'negative';
+                    const sideText = pos.side === 'long' ? 'LONG' : 'SHORT';
+                    const sideClass = pos.side === 'long' ? 'long' : 'short';
                     // 开仓倍数 = 开仓价值 / (数量 * 开仓价格)，简化为显示 leverage 字段（如果API提供）
                     // 否则计算为：开仓价值 / (可用保证金)，这里假设 leverage 可从持仓信息中获取
                     const leverage = pos.leverage || '-';
                     return `
                         <tr>
                             <td>${pos.symbol}</td>
-                            <td class="${sideClass}">${sideText}</td>
+                            <td><span class="side-badge ${sideClass}">${sideText}</span></td>
                             <td>${leverage}x</td>
                             <td>$${pos.entryPrice.toFixed(4)}</td>
                             <td>$${pos.openValue.toFixed(2)}</td>
@@ -208,61 +208,82 @@ class TradingMonitor {
             }
             
             if (container) {
-                container.innerHTML = data.trades.map(trade => {
-                    const date = new Date(trade.timestamp);
-                    const timeStr = date.toLocaleString('zh-CN', {
-                        timeZone: 'Asia/Shanghai',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    });
+                // 配对开仓和平仓交易
+                const pairedTrades = [];
+                const trades = [...data.trades];
+                
+                // 先找出所有平仓交易，然后匹配对应的开仓交易
+                const closeTrades = trades.filter(t => t.type === 'close');
+                
+                for (const closeTrade of closeTrades) {
+                    // 查找对应的开仓交易（同symbol、同side、在平仓之前）
+                    const openTrade = trades.find(t => 
+                        t.type === 'open' && 
+                        t.symbol === closeTrade.symbol && 
+                        t.side === closeTrade.side &&
+                        new Date(t.timestamp) < new Date(closeTrade.timestamp) &&
+                        !pairedTrades.some(pt => pt.openTrade?.id === t.id)
+                    );
                     
-                    // 对于平仓交易，显示盈亏
-                    const pnlHtml = trade.type === 'close' && trade.pnl !== null && trade.pnl !== undefined
-                        ? `<div class="trade-field">
-                            <span class="label">盈亏</span>
-                            <span class="value ${trade.pnl >= 0 ? 'profit' : 'loss'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)} USDT</span>
-                           </div>`
-                        : '';
-                    
-                    return `
-                        <div class="trade-item">
-                            <div class="trade-header">
-                                <div class="trade-symbol">${trade.symbol}</div>
-                                <div class="trade-time">${timeStr}</div>
-                            </div>
-                            <div class="trade-info">
-                                <div class="trade-field">
-                                    <span class="label">方向</span>
-                                    <span class="value ${trade.side}">${trade.side === 'long' ? '做多' : trade.side === 'short' ? '做空' : '-'}</span>
-                                </div>
-                                <div class="trade-field">
-                                    <span class="label">类型</span>
-                                    <span class="value">${trade.type === 'open' ? '开仓' : '平仓'}</span>
-                                </div>
-                                <div class="trade-field">
-                                    <span class="label">数量</span>
-                                    <span class="value">${trade.quantity.toFixed(4)}</span>
-                                </div>
-                                <div class="trade-field">
-                                    <span class="label">价格</span>
-                                    <span class="value">${trade.price.toFixed(4)}</span>
-                                </div>
-                                <div class="trade-field">
-                                    <span class="label">杠杆</span>
-                                    <span class="value">${trade.leverage}x</span>
-                                </div>
-                                <div class="trade-field">
-                                    <span class="label">手续费</span>
-                                    <span class="value">${trade.fee.toFixed(4)}</span>
-                                </div>
-                                ${pnlHtml}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                    if (openTrade) {
+                        pairedTrades.push({
+                            openTrade,
+                            closeTrade,
+                            timestamp: closeTrade.timestamp
+                        });
+                    }
+                }
+                
+                // 按平仓时间降序排序，只显示最近25条
+                pairedTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                const displayTrades = pairedTrades.slice(0, 25);
+                
+                if (displayTrades.length === 0) {
+                    container.innerHTML = '<tr><td colspan="10" class="no-data">暂无完整交易记录</td></tr>';
+                } else {
+                    container.innerHTML = displayTrades.map(pair => {
+                        const { openTrade, closeTrade } = pair;
+                        
+                        // 计算持仓时间
+                        const openTime = new Date(openTrade.timestamp);
+                        const closeTime = new Date(closeTrade.timestamp);
+                        const holdingTimeMs = closeTime - openTime;
+                        const hours = Math.floor(holdingTimeMs / (1000 * 60 * 60));
+                        const minutes = Math.floor((holdingTimeMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const holdingTimeStr = `${hours}时 ${minutes}分`;
+                        
+                        // 计算名义价值
+                        const notionalOpen = (openTrade.quantity * openTrade.price).toFixed(2);
+                        const notionalClose = (closeTrade.quantity * closeTrade.price).toFixed(2);
+                        
+                        // 总手续费
+                        const totalFees = (openTrade.fee + closeTrade.fee).toFixed(2);
+                        
+                        // 净盈亏
+                        const netPnl = closeTrade.pnl || 0;
+                        const pnlClass = netPnl >= 0 ? 'profit' : 'loss';
+                        const pnlSign = netPnl >= 0 ? '+' : '';
+                        
+                        // 方向和币种
+                        const sideText = openTrade.side === 'long' ? 'LONG' : 'SHORT';
+                        const sideClass = openTrade.side === 'long' ? 'long' : 'short';
+                        
+                        return `
+                            <tr>
+                                <td><strong>${openTrade.symbol}</strong></td>
+                                <td><span class="side-badge ${sideClass}">${sideText}</span></td>
+                                <td>$${openTrade.price.toFixed(2)}</td>
+                                <td>$${closeTrade.price.toFixed(2)}</td>
+                                <td>${openTrade.quantity.toFixed(4)}</td>
+                                <td>${holdingTimeStr}</td>
+                                <td>$${notionalOpen}</td>
+                                <td>$${notionalClose}</td>
+                                <td>$${totalFees}</td>
+                                <td class="${pnlClass}">${pnlSign}$${netPnl.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
             }
             
         } catch (error) {

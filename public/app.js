@@ -297,8 +297,8 @@ async function loadLogsData() {
 // 加载交易历史
 async function loadTradesData() {
     try {
-        // 不传 contract 参数，获取所有合约的成交记录
-        const response = await fetch('/api/trades?limit=10');
+        // 获取最近25条完整的交易记录
+        const response = await fetch('/api/trades?limit=50');
         const data = await response.json();
         
         const container = document.getElementById('tradesContainer');
@@ -310,63 +310,109 @@ async function loadTradesData() {
             return;
         }
         
-        countEl.textContent = `(${data.trades.length})`;
+        // 将交易配对（开仓+平仓）
+        const completedTrades = [];
+        const openTrades = new Map();
         
-        container.innerHTML = data.trades.map(trade => {
-            const date = new Date(trade.timestamp);
-            const timeStr = date.toLocaleString('zh-CN', {
-                timeZone: 'Asia/Shanghai',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            
-            // 对于平仓交易，显示盈亏
-            const pnlHtml = trade.type === 'close' && trade.pnl !== null && trade.pnl !== undefined
-                ? `<div class="trade-field">
-                    <span class="label">盈亏</span>
-                    <span class="value ${trade.pnl >= 0 ? 'profit' : 'loss'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)} USDT</span>
-                   </div>`
-                : '';
-            
-            return `
-                <div class="trade-item">
-                    <div class="trade-header">
-                        <div class="trade-symbol">${trade.symbol}</div>
-                        <div class="trade-time">${timeStr}</div>
-                    </div>
-                    <div class="trade-info">
-                        <div class="trade-field">
-                            <span class="label">方向</span>
-                            <span class="value ${trade.side}">${trade.side === 'long' ? '做多' : trade.side === 'short' ? '做空' : '-'}</span>
-                        </div>
-                        <div class="trade-field">
-                            <span class="label">类型</span>
-                            <span class="value">${trade.type === 'open' ? '开仓' : '平仓'}</span>
-                        </div>
-                        <div class="trade-field">
-                            <span class="label">数量</span>
-                            <span class="value">${trade.quantity.toFixed(4)}</span>
-                        </div>
-                        <div class="trade-field">
-                            <span class="label">价格</span>
-                            <span class="value">${trade.price.toFixed(4)}</span>
-                        </div>
-                        <div class="trade-field">
-                            <span class="label">杠杆</span>
-                            <span class="value">${trade.leverage}x</span>
-                        </div>
-                        <div class="trade-field">
-                            <span class="label">手续费</span>
-                            <span class="value">${trade.fee.toFixed(4)}</span>
-                        </div>
-                        ${pnlHtml}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        // 按时间倒序处理，先遇到平仓，再找对应的开仓
+        for (const trade of data.trades) {
+            if (trade.type === 'close') {
+                completedTrades.push({
+                    closeData: trade,
+                    openData: null
+                });
+            } else if (trade.type === 'open') {
+                // 尝试匹配最近的未配对平仓
+                const unmatchedClose = completedTrades.find(t => 
+                    !t.openData && 
+                    t.closeData.symbol === trade.symbol && 
+                    t.closeData.side === trade.side
+                );
+                if (unmatchedClose) {
+                    unmatchedClose.openData = trade;
+                }
+            }
+        }
+        
+        // 只显示完整配对的交易，最多25条
+        const pairedTrades = completedTrades
+            .filter(t => t.openData && t.closeData)
+            .slice(0, 25);
+        
+        if (pairedTrades.length === 0) {
+            container.innerHTML = '<p class="no-data">暂无完整交易记录</p>';
+            countEl.textContent = '';
+            return;
+        }
+        
+        countEl.textContent = `(${pairedTrades.length})`;
+        
+        // 创建表格显示
+        container.innerHTML = `
+            <div class="trades-table-wrapper">
+                <table class="trades-table">
+                    <thead>
+                        <tr>
+                            <th>方向</th>
+                            <th>币种</th>
+                            <th>开仓价格</th>
+                            <th>平仓价格</th>
+                            <th>数量</th>
+                            <th>持仓时间</th>
+                            <th>开仓价值</th>
+                            <th>平仓价值</th>
+                            <th>总手续费</th>
+                            <th>净盈亏</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${pairedTrades.map(trade => {
+                            const { openData, closeData } = trade;
+                            
+                            // 计算持仓时间
+                            const openTime = new Date(openData.timestamp);
+                            const closeTime = new Date(closeData.timestamp);
+                            const holdingMs = closeTime.getTime() - openTime.getTime();
+                            const holdingHours = Math.floor(holdingMs / (1000 * 60 * 60));
+                            const holdingMinutes = Math.floor((holdingMs % (1000 * 60 * 60)) / (1000 * 60));
+                            const holdingTimeStr = holdingHours > 0 
+                                ? `${holdingHours}H ${holdingMinutes}M`
+                                : `${holdingMinutes}M`;
+                            
+                            // 计算价值和盈亏
+                            const openValue = openData.price * openData.quantity;
+                            const closeValue = closeData.price * closeData.quantity;
+                            const totalFee = (openData.fee || 0) + (closeData.fee || 0);
+                            const netPnl = closeData.pnl || 0;
+                            
+                            // 方向显示
+                            const sideText = openData.side === 'long' ? 'LONG' : 'SHORT';
+                            const sideClass = openData.side === 'long' ? 'long' : 'short';
+                            
+                            return `
+                                <tr class="trade-row">
+                                    <td><span class="side-badge ${sideClass}">${sideText}</span></td>
+                                    <td class="coin-cell">
+                                        <span class="coin-icon">●</span>
+                                        <span class="coin-name">${openData.symbol}</span>
+                                    </td>
+                                    <td>$${openData.price.toFixed(openData.price >= 1000 ? 1 : 4)}</td>
+                                    <td>$${closeData.price.toFixed(closeData.price >= 1000 ? 1 : 4)}</td>
+                                    <td>${openData.quantity.toFixed(2)}</td>
+                                    <td>${holdingTimeStr}</td>
+                                    <td>$${openValue.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</td>
+                                    <td>$${closeValue.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</td>
+                                    <td>$${totalFee.toFixed(2)}</td>
+                                    <td class="${netPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">
+                                        ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
         
     } catch (error) {
         console.error('加载交易历史失败:', error);
