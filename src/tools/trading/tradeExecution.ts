@@ -218,9 +218,21 @@ export const openPositionTool = createTool({
         minSize = lotSizeFilter ? Number.parseFloat(lotSizeFilter.minQty) : 0.001;
         maxSize = lotSizeFilter ? Number.parseFloat(lotSizeFilter.maxQty) : 1000000;
         
+        // 计算stepSize的小数位数
+        const stepSizeStr = stepSize.toString();
+        const decimalPlaces = stepSizeStr.includes('.') 
+          ? stepSizeStr.split('.')[1].length 
+          : 0;
+        
         // 计算可以购买的币种数量: quantity = (adjustedAmountUsdt × leverage) / price
         quantity = (adjustedAmountUsdt * leverage) / currentPrice;
+        
+        // 使用stepSize对齐（向下取整到最接近的stepSize倍数）
         quantity = Math.floor(quantity / stepSize) * stepSize;
+        
+        // 修正浮点数精度问题
+        quantity = Number(quantity.toFixed(decimalPlaces));
+        
         quantity = Math.max(quantity, minSize);
         quantity = Math.min(quantity, maxSize);
         
@@ -230,11 +242,12 @@ export const openPositionTool = createTool({
         if (actualMargin > availableBalance) {
           quantity = (availableBalance * leverage) / currentPrice;
           quantity = Math.floor(quantity / stepSize) * stepSize;
+          quantity = Number(quantity.toFixed(decimalPlaces));
           actualMargin = (quantity * currentPrice) / leverage;
-          logger.warn(`调整数量以适应可用余额: ${quantity.toFixed(3)} ${symbol}, 保证金: ${actualMargin.toFixed(2)} USDT`);
+          logger.warn(`调整数量以适应可用余额: ${quantity.toFixed(decimalPlaces)} ${symbol}, 保证金: ${actualMargin.toFixed(2)} USDT`);
         }
         
-        logger.info(`开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${quantity.toFixed(3)} ${symbol} (杠杆${leverage}x, 保证金${actualMargin.toFixed(2)} USDT)`);
+        logger.info(`开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${quantity.toFixed(decimalPlaces)} ${symbol} (杠杆${leverage}x, 保证金${actualMargin.toFixed(2)} USDT)`);
         
       } else {
         // ===== Gate.io 永续合约计算逻辑 =====
@@ -521,8 +534,8 @@ export const openPositionTool = createTool({
         leverage,
         actualMargin,
         message: EXCHANGE_TYPE === 'binance' 
-          ? `✅ 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${contractAmount.toFixed(3)} ${symbol}，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。⚠️ 未设置止盈止损，请在每个周期主动决策是否平仓。`
-          : `✅ 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${Math.abs(size)} 张 (${contractAmount.toFixed(4)} ${symbol})，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。⚠️ 未设置止盈止损，请在每个周期主动决策是否平仓。`,
+          ? `[工具执行结果] 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${contractAmount.toFixed(3)} ${symbol}，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。未设置止盈止损，请在每个周期主动决策是否平仓。现在请输出结构化的决策文本（市场分析+决策理由+执行动作）。`
+          : `[工具执行结果] 成功开仓 ${symbol} ${side === "long" ? "做多" : "做空"} ${Math.abs(size)} 张 (${contractAmount.toFixed(4)} ${symbol})，成交价 ${actualFillPrice.toFixed(2)}，保证金 ${actualMargin.toFixed(2)} USDT，杠杆 ${leverage}x。未设置止盈止损，请在每个周期主动决策是否平仓。现在请输出结构化的决策文本（市场分析+决策理由+执行动作）。`,
       };
     } catch (error: any) {
       return {
@@ -823,7 +836,7 @@ export const closePositionTool = createTool({
         pnl,                          // 净盈亏（已扣除手续费）
         fee: totalFee,                // 总手续费
         totalBalance,
-        message: `成功平仓 ${symbol} ${actualCloseSize.toFixed(EXCHANGE_TYPE === 'binance' ? 3 : 0)} ${EXCHANGE_TYPE === 'binance' ? symbol : '张'}，入场价 ${entryPrice.toFixed(4)}，平仓价 ${actualExitPrice.toFixed(4)}，净盈亏 ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT (已扣手续费 ${totalFee.toFixed(2)} USDT)，当前总资产 ${totalBalance.toFixed(2)} USDT`,
+        message: `[工具执行结果] 成功平仓 ${symbol} ${actualCloseSize.toFixed(EXCHANGE_TYPE === 'binance' ? 3 : 0)} ${EXCHANGE_TYPE === 'binance' ? symbol : '张'}，入场价 ${entryPrice.toFixed(4)}，平仓价 ${actualExitPrice.toFixed(4)}，净盈亏 ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT (已扣手续费 ${totalFee.toFixed(2)} USDT)，当前总资产 ${totalBalance.toFixed(2)} USDT。现在请输出结构化的决策文本（市场分析+决策理由+执行动作）。`,
       };
     } catch (error: any) {
       logger.error(`平仓失败: ${error.message}`, error);

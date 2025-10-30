@@ -373,7 +373,13 @@ async function collectMarketData() {
         }
       });
 
-      // 保存市场数据
+      // 计算日内时序数据（使用3分钟K线）
+      const intradaySeries = calculateIntradaySeries(candles3m);
+      
+      // 计算长期上下文数据（使用1小时K线）
+      const longerTermContext = calculateLongerTermContext(candles1h);
+      
+      // 保存市场数据（确保格式与 generateTradingPrompt 期望的一致）
       marketData[symbol] = {
         ticker,
         candles1m: sortedCandles1m,
@@ -382,7 +388,16 @@ async function collectMarketData() {
         candles15m,
         candles30m,
         candles1h,
-        indicators: timeframeIndicators.m5, // 主要使用5分钟指标
+        // 与 tradingAgent.ts 期望的格式保持一致
+        price: Number(ticker?.last || 0),
+        ema20: timeframeIndicators.m5.ema20,
+        macd: timeframeIndicators.m5.macd,
+        rsi7: calcRSI(candles5m.map((c: any) => Number(c.close)), 7), // 计算7周期RSI
+        rsi14: timeframeIndicators.m5.rsi14,
+        intradaySeries,
+        longerTermContext,
+        // 保留原有字段用于其他用途
+        indicators: timeframeIndicators.m5,
         indicators1m: timeframeIndicators.m1,
         indicators3m: timeframeIndicators.m3,
         indicators5m: timeframeIndicators.m5,
@@ -418,8 +433,8 @@ function calculateIntradaySeries(candles: any[]) {
     };
   }
 
-  // 提取收盘价
-  const closes = candles.map((c) => Number.parseFloat(c.c || "0")).filter(n => Number.isFinite(n));
+  // 提取收盘价 - 使用正确的字段名 close
+  const closes = candles.map((c) => Number.parseFloat(c.close || "0")).filter(n => Number.isFinite(n));
   
   if (closes.length === 0) {
     return {
@@ -484,10 +499,11 @@ function calculateLongerTermContext(candles: any[]) {
     };
   }
 
-  const closes = candles.map((c) => Number.parseFloat(c.c || "0")).filter(n => Number.isFinite(n));
-  const highs = candles.map((c) => Number.parseFloat(c.h || "0")).filter(n => Number.isFinite(n));
-  const lows = candles.map((c) => Number.parseFloat(c.l || "0")).filter(n => Number.isFinite(n));
-  const volumes = candles.map((c) => Number.parseFloat(c.v || "0")).filter(n => Number.isFinite(n));
+  // 使用正确的字段名
+  const closes = candles.map((c) => Number.parseFloat(c.close || "0")).filter(n => Number.isFinite(n));
+  const highs = candles.map((c) => Number.parseFloat(c.high || "0")).filter(n => Number.isFinite(n));
+  const lows = candles.map((c) => Number.parseFloat(c.low || "0")).filter(n => Number.isFinite(n));
+  const volumes = candles.map((c) => Number.parseFloat(c.volume || "0")).filter(n => Number.isFinite(n));
 
   // 计算 EMA
   const ema20 = calcEMA(closes, 20);
@@ -1675,4 +1691,3 @@ export function setTradingStartTime(time: Date) {
 export function setIterationCount(count: number) {
   iterationCount = count;
 }
-
