@@ -135,7 +135,7 @@ class TradingMonitor {
             
             if (!data.positions || data.positions.length === 0) {
                 if (positionsBody) {
-                    positionsBody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无持仓</td></tr>';
+                    positionsBody.innerHTML = '<tr><td colspan="8" class="no-data">暂无持仓</td></tr>';
                 }
                 return;
             }
