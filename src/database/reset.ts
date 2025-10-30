@@ -19,78 +19,12 @@
 import { createClient } from "@libsql/client";
 import { createPinoLogger } from "@voltagent/logger";
 import "dotenv/config";
+import { CREATE_TABLES_SQL } from "./schema";
 
 const logger = createPinoLogger({
   name: "db-reset",
   level: "info",
 });
-
-const CREATE_TABLES_SQL = `
-CREATE TABLE IF NOT EXISTS account_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    total_value REAL NOT NULL,
-    available_cash REAL NOT NULL,
-    unrealized_pnl REAL NOT NULL,
-    realized_pnl REAL NOT NULL,
-    return_percent REAL NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS positions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    quantity REAL NOT NULL,
-    entry_price REAL NOT NULL,
-    current_price REAL NOT NULL,
-    liquidation_price REAL NOT NULL,
-    unrealized_pnl REAL NOT NULL,
-    leverage INTEGER NOT NULL,
-    side TEXT NOT NULL,
-    entry_order_id TEXT,
-    opened_at TEXT NOT NULL,
-    closed_at TEXT
-);
-
-CREATE TABLE IF NOT EXISTS trading_signals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    price REAL NOT NULL,
-    ema_20 REAL,
-    ema_50 REAL,
-    macd REAL,
-    rsi_7 REAL,
-    rsi_14 REAL,
-    volume REAL,
-    funding_rate REAL
-);
-
-CREATE TABLE IF NOT EXISTS agent_decisions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    iteration INTEGER NOT NULL,
-    market_analysis TEXT NOT NULL,
-    decision TEXT NOT NULL,
-    actions_taken TEXT NOT NULL,
-    account_value REAL NOT NULL,
-    positions_count INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS trade_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    symbol TEXT NOT NULL,
-    action TEXT NOT NULL,
-    order_id TEXT,
-    price REAL NOT NULL,
-    quantity REAL NOT NULL,
-    amount REAL NOT NULL,
-    leverage INTEGER,
-    pnl REAL,
-    fee REAL,
-    status TEXT NOT NULL
-);
-`;
 
 /**
  * 强制重新初始化数据库
@@ -111,10 +45,11 @@ async function resetDatabase() {
 
     // 删除所有表
     logger.info("🗑️  删除现有表...");
-    await client.execute("DROP TABLE IF EXISTS trade_logs");
+    await client.execute("DROP TABLE IF EXISTS system_config");
     await client.execute("DROP TABLE IF EXISTS agent_decisions");
     await client.execute("DROP TABLE IF EXISTS trading_signals");
     await client.execute("DROP TABLE IF EXISTS positions");
+    await client.execute("DROP TABLE IF EXISTS trades");
     await client.execute("DROP TABLE IF EXISTS account_history");
     logger.info("✅ 现有表已删除");
 
