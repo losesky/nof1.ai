@@ -252,10 +252,6 @@ class TradingMonitor {
                         const minutes = Math.floor((holdingTimeMs % (1000 * 60 * 60)) / (1000 * 60));
                         const holdingTimeStr = `${hours}时 ${minutes}分`;
                         
-                        // 计算名义价值
-                        const notionalOpen = (openTrade.quantity * openTrade.price).toFixed(2);
-                        const notionalClose = (closeTrade.quantity * closeTrade.price).toFixed(2);
-                        
                         // 总手续费
                         const totalFees = (openTrade.fee + closeTrade.fee).toFixed(2);
                         
@@ -268,16 +264,18 @@ class TradingMonitor {
                         const sideText = openTrade.side === 'long' ? 'LONG' : 'SHORT';
                         const sideClass = openTrade.side === 'long' ? 'long' : 'short';
                         
+                        // 杠杆
+                        const leverage = openTrade.leverage || '-';
+                        
                         return `
                             <tr>
                                 <td><strong>${openTrade.symbol}</strong></td>
                                 <td><span class="side-badge ${sideClass}">${sideText}</span></td>
+                                <td>${leverage}x</td>
                                 <td>$${openTrade.price.toFixed(2)}</td>
                                 <td>$${closeTrade.price.toFixed(2)}</td>
                                 <td>${openTrade.quantity.toFixed(4)}</td>
                                 <td>${holdingTimeStr}</td>
-                                <td>$${notionalOpen}</td>
-                                <td>$${notionalClose}</td>
                                 <td>$${totalFees}</td>
                                 <td class="${pnlClass}">${pnlSign}$${netPnl.toFixed(2)}</td>
                             </tr>

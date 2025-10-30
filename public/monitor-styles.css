@@ -631,7 +631,7 @@ body {
 
 .trades-table td {
     padding: 0.9rem 1rem;
-    color: var(--text-primary);
+    /* color: var(--text-primary); */
     white-space: nowrap;
 }
 
