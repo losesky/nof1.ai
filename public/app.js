@@ -305,7 +305,7 @@ async function loadTradesData() {
         const countEl = document.getElementById('tradesCount');
         
         if (!data.trades || data.trades.length === 0) {
-            container.innerHTML = '<p class="no-data">暂无交易记录</p>';
+            container.innerHTML = '<p colspan="10" class="no-data">暂无交易记录</p>';
             countEl.textContent = '';
             return;
         }
