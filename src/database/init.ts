@@ -63,45 +63,37 @@ async function initDatabase() {
     const count = (existingHistory.rows[0] as any).count as number;
 
     if (count > 0) {
-      // 检查最新记录与当前账户是否有显著差异
+      // 数据库已初始化，只检查状态不清空数据
+      logger.info(`数据库已有 ${count} 条账户历史记录`);
+      
+      // 检查最新记录与当前账户的差异（仅用于日志显示）
       const latestRecord = await client.execute(
         "SELECT * FROM account_history ORDER BY timestamp DESC LIMIT 1"
       );
       const lastBalance = Number.parseFloat(latestRecord.rows[0]?.total_value as string || "0");
       
       if (Math.abs(lastBalance - totalBalance) > 0.01) {
-        logger.warn(`⚠️  检测到账户余额变更: ${lastBalance} USDT -> ${totalBalance} USDT`);
-        logger.info("更新账户数据...");
-        
-        // 清空旧数据
-        await client.execute("DELETE FROM trades");
-        await client.execute("DELETE FROM positions");
-        await client.execute("DELETE FROM account_history");
-        await client.execute("DELETE FROM trading_signals");
-        await client.execute("DELETE FROM agent_decisions");
-        
-        logger.info("✅ 旧数据已清空");
-      } else {
-        logger.info(`数据库已有 ${count} 条账户历史记录，跳过初始化`);
-        logger.info("当前账户状态:");
-        logger.info(`  总资产: ${totalBalance} USDT`);
-        logger.info(`  可用资金: ${availableBalance} USDT`);
-        logger.info(`  未实现盈亏: ${unrealizedPnl} USDT`);
-        logger.info(`  总收益率: ${((totalBalance / 100 - 1) * 100).toFixed(2)}%`);
-        
-        if (currentPositions.length > 0) {
-          logger.info(`\n当前持仓 (${currentPositions.length}):`);
-          for (const pos of currentPositions) {
-            logger.info(`  ${pos.contract}: ${pos.size} @ ${pos.entryPrice} (${pos.side}, ${pos.leverage}x)`);
-          }
-        } else {
-          logger.info("\n当前无持仓");
-        }
-        
-        logger.info("\n✅ 数据库初始化完成");
-        client.close();
-        return;
+        logger.info(`💰 账户余额变化: ${lastBalance.toFixed(2)} USDT -> ${totalBalance.toFixed(2)} USDT`);
       }
+      
+      logger.info("当前账户状态:");
+      logger.info(`  总资产: ${totalBalance} USDT`);
+      logger.info(`  可用资金: ${availableBalance} USDT`);
+      logger.info(`  未实现盈亏: ${unrealizedPnl} USDT`);
+      logger.info(`  总收益率: ${((totalBalance / 100 - 1) * 100).toFixed(2)}%`);
+      
+      if (currentPositions.length > 0) {
+        logger.info(`\n当前持仓 (${currentPositions.length}):`);
+        for (const pos of currentPositions) {
+          logger.info(`  ${pos.contract}: ${pos.size} @ ${pos.entryPrice} (${pos.side}, ${pos.leverage}x)`);
+        }
+      } else {
+        logger.info("\n当前无持仓");
+      }
+      
+      logger.info("\n✅ 数据库检查完成（数据已保留）");
+      client.close();
+      return;
     }
 
     // 插入最新账户记录

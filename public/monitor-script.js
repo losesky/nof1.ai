@@ -44,7 +44,8 @@ class TradingMonitor {
                 this.loadPositionsData(),
                 this.loadTradesData(),
                 this.loadLogsData(),
-                this.loadTickerPrices()
+                this.loadTickerPrices(),
+                this.loadStatsData()
             ]);
         } catch (error) {
             console.error('加载初始数据失败:', error);
@@ -67,26 +68,29 @@ class TradingMonitor {
             // 计算总权益（总资产 + 未实现盈亏）
             const totalEquity = data.totalBalance + data.unrealisedPnl;
             
-            // 更新收益率（ROI）
+            // 更新保证金比例（从后端获取精确值）
             const roiPercentEl = document.getElementById('roi-percent');
             if (roiPercentEl) {
-                const roiPercent = ((totalEquity - data.initialBalance) / data.initialBalance) * 100;
-                const roiValue = (roiPercent >= 0 ? '' : '') + roiPercent.toFixed(2) + '%';
+                // 使用后端返回的保证金比例（marginRatio）
+                const marginRatio = data.marginRatio || 0;
+                const roiValue = marginRatio.toFixed(2) + '%';
                 roiPercentEl.textContent = roiValue;
-                roiPercentEl.className = roiPercent >= 0 ? 'positive' : 'negative';
+                // 保证金比例越高风险越大，接近100%会被强平
+                roiPercentEl.className = marginRatio < 50 ? 'positive' : (marginRatio < 80 ? 'warning' : 'negative');
             }
             
-            // 更新维持保证金（估算为持仓保证金的10%，实际应从API获取）
+            // 更新维持保证金（使用后端返回的精确值）
             const maintenanceMarginEl = document.getElementById('maintenance-margin');
             if (maintenanceMarginEl) {
-                const maintenanceMargin = data.positionMargin * 0.1; // 简化计算
+                const maintenanceMargin = data.maintenanceMargin || 0;
                 maintenanceMarginEl.textContent = maintenanceMargin.toFixed(4) + ' USDT';
             }
             
-            // 更新保证金余额（总资产）
+            // 更新保证金余额（使用后端返回的精确值）
             const marginBalanceEl = document.getElementById('margin-balance');
             if (marginBalanceEl) {
-                marginBalanceEl.textContent = data.totalBalance.toFixed(4) + ' USDT';
+                const marginBalance = data.marginBalance || data.totalBalance;
+                marginBalanceEl.textContent = marginBalance.toFixed(4) + ' USDT';
             }
             
             // 更新总权益
@@ -182,7 +186,8 @@ class TradingMonitor {
     // 加载交易记录 - 使用和 index.html 相同的布局
     async loadTradesData() {
         try {
-            const response = await fetch('/api/trades?limit=10');
+            // 请求更多历史记录以便能配对开仓和平仓（避免只抓到平仓或只抓到开仓）
+            const response = await fetch('/api/trades?limit=200');
             const data = await response.json();
             
             if (data.error) {
@@ -267,8 +272,18 @@ class TradingMonitor {
                         // 杠杆
                         const leverage = openTrade.leverage || '-';
                         
+                        // 平仓时间（格式化为当地时间）
+                        const closeTimeStr = new Date(closeTrade.timestamp).toLocaleString('zh-CN', {
+                            timeZone: 'Asia/Shanghai',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        
                         return `
                             <tr>
+                                <td>${closeTimeStr}</td>
                                 <td><strong>${openTrade.symbol}</strong></td>
                                 <td><span class="side-badge ${sideClass}">${sideText}</span></td>
                                 <td>${leverage}x</td>
@@ -280,7 +295,7 @@ class TradingMonitor {
                                 <td class="${pnlClass}">${pnlSign}$${netPnl.toFixed(2)}</td>
                             </tr>
                         `;
-                    }).join('');
+                 }).join('');
                 }
             }
             
@@ -387,6 +402,87 @@ class TradingMonitor {
         });
     }
 
+    // 加载交易统计数据
+    async loadStatsData() {
+        try {
+            const response = await fetch('/api/stats');
+            const data = await response.json();
+            
+            if (data.error) {
+                console.error('获取统计数据失败:', data.error);
+                return;
+            }
+            
+            // 更新平均杠杆
+            const avgLeverageEl = document.getElementById('avg-leverage');
+            if (avgLeverageEl) {
+                avgLeverageEl.textContent = data.avgLeverage ? data.avgLeverage.toFixed(1) : '--';
+            }
+            
+            // 更新胜率
+            const winRateEl = document.getElementById('win-rate');
+            if (winRateEl) {
+                winRateEl.textContent = data.winRate ? data.winRate.toFixed(1) + '%' : '--';
+            }
+            
+            // 更新夏普比率
+            const sharpeRatioEl = document.getElementById('sharpe-ratio');
+            if (sharpeRatioEl) {
+                const sharpe = data.sharpeRatio || 0;
+                sharpeRatioEl.textContent = sharpe ? sharpe.toFixed(2) : '--';
+            }
+            
+            // 更新最大盈利
+            const biggestWinEl = document.getElementById('biggest-win');
+            if (biggestWinEl) {
+                const maxWin = data.maxWin || 0;
+                biggestWinEl.textContent = '$' + maxWin.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+            
+            // 更新最大亏损
+            const biggestLossEl = document.getElementById('biggest-loss');
+            if (biggestLossEl) {
+                const maxLoss = data.maxLoss || 0;
+                biggestLossEl.textContent = '-$' + Math.abs(maxLoss).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+            
+            // 更新持仓时间分布
+            if (data.holdTimes) {
+                const holdLongEl = document.getElementById('hold-time-long');
+                const holdShortEl = document.getElementById('hold-time-short');
+                const holdFlatEl = document.getElementById('hold-time-flat');
+                
+                const holdBarLongEl = document.getElementById('hold-bar-long');
+                const holdBarShortEl = document.getElementById('hold-bar-short');
+                const holdBarFlatEl = document.getElementById('hold-bar-flat');
+                
+                if (holdLongEl) {
+                    holdLongEl.textContent = data.holdTimes.long.toFixed(1) + '%';
+                }
+                if (holdShortEl) {
+                    holdShortEl.textContent = data.holdTimes.short.toFixed(1) + '%';
+                }
+                if (holdFlatEl) {
+                    holdFlatEl.textContent = data.holdTimes.flat.toFixed(1) + '%';
+                }
+                
+                // 更新进度条宽度
+                if (holdBarLongEl) {
+                    holdBarLongEl.style.width = data.holdTimes.long.toFixed(1) + '%';
+                }
+                if (holdBarShortEl) {
+                    holdBarShortEl.style.width = data.holdTimes.short.toFixed(1) + '%';
+                }
+                if (holdBarFlatEl) {
+                    holdBarFlatEl.style.width = data.holdTimes.flat.toFixed(1) + '%';
+                }
+            }
+            
+        } catch (error) {
+            console.error('加载统计数据失败:', error);
+        }
+    }
+
     // 启动数据更新
     startDataUpdates() {
         // 每3秒更新账户和持仓（实时数据）
@@ -402,11 +498,12 @@ class TradingMonitor {
             await this.loadTickerPrices();
         }, 10000);
 
-        // 每30秒更新交易记录和日志
+        // 每30秒更新交易记录、日志和统计数据
         setInterval(async () => {
             await Promise.all([
                 this.loadTradesData(),
-                this.loadLogsData()
+                this.loadLogsData(),
+                this.loadStatsData()
             ]);
         }, 30000);
 

@@ -163,16 +163,16 @@ body {
     min-height: 500px;
 }
 
-/* 资产曲线图表区域 - 占据第一行 */
+/* 资产曲线图表区域 - 占据第一行左侧 */
 .chart-section:first-child {
     grid-column: 1 / 2;
     grid-row: 1 / 2;
 }
 
-/* AI 决策区域 - 占据第二行，跨两列 */
+/* AI 决策区域 - 占据第三行，跨两列 */
 .chart-section:nth-child(2) {
     grid-column: 1 / 3;
-    grid-row: 2 / 3;
+    grid-row: 3 / 4;
 }
 
 .chart-header {
@@ -286,6 +286,845 @@ body {
     color: var(--accent-red);
 }
 
+/* Trading Statistics Section */
+.stats-section {
+    grid-column: 1 / 3;
+    grid-row: 2 / 3;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+}
+
+.stats-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stats-title {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stats-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+/* 左侧指标区域 */
+.stats-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.metric-row:last-child {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.metric-item:hover {
+    border-color: var(--text-dim);
+}
+
+.metric-item.highlight {
+    background: linear-gradient(135deg, rgba(0, 255, 170, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+.metric-value.positive {
+    color: var(--accent-green);
+}
+
+.metric-value.negative {
+    color: var(--accent-red);
+}
+
+/* 右侧分布图 */
+.stats-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.distribution-header {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.distribution-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.distribution-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.distribution-bar {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.distribution-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+.distribution-progress {
+    height: 24px;
+    background-color: rgba(0, 255, 170, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.distribution-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+    border-radius: 12px;
+}
+
+.distribution-fill.long {
+    background: linear-gradient(90deg, var(--accent-green) 0%, rgba(0, 255, 170, 0.7) 100%);
+}
+
+.distribution-fill.short {
+    background: linear-gradient(90deg, var(--accent-red) 0%, rgba(255, 0, 0, 0.7) 100%);
+}
+
+.distribution-fill.flat {
+    background: linear-gradient(90deg, var(--accent-yellow) 0%, rgba(255, 255, 0, 0.7) 100%);
+}
+
+.distribution-value {
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-align: left;
+}
+
+.distribution-value.long {
+    color: var(--accent-green);
+}
+
+.distribution-value.short {
+    color: var(--accent-red);
+}
+
+.distribution-value.flat {
+    color: var(--accent-yellow);
+}
+
+/* Main Content */
+.main-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 2rem;
+}
+
+/* Chart Section */
+.chart-section {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    position: relative;
+    min-height: 500px;
+}
+
+/* 资产曲线图表区域 - 占据第一行左侧 */
+.chart-section:first-child {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+}
+
+/* AI 决策区域 - 占据第三行，跨两列 */
+.chart-section:nth-child(2) {
+    grid-column: 1 / 3;
+    grid-row: 3 / 4;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.decision-title {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.decision-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.decision-time {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+}
+
+.decision-iteration {
+    color: var(--accent-green);
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+/* Chart Container */
+.chart-container {
+    height: 400px;
+    position: relative;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.chart-container canvas {
+    max-height: 100%;
+}
+
+.chart-title {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.timeframe-select {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.8rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.timeframe-select:hover {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 5px var(--border-color);
+}
+
+.timeframe-select:focus {
+    outline: none;
+    border-color: var(--accent-green);
+}
+
+.decision-container {
+    height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+}
+
+.decision-content {
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.decision-text {
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.decision-content .loading,
+.decision-content .no-data,
+.decision-content .error {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 2rem;
+}
+
+.decision-content .error {
+    color: var(--accent-red);
+}
+
+/* Trading Statistics Section */
+.stats-section {
+    grid-column: 1 / 3;
+    grid-row: 2 / 3;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+}
+
+.stats-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stats-title {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stats-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+/* 左侧指标区域 */
+.stats-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.metric-row:last-child {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.metric-item:hover {
+    border-color: var(--text-dim);
+}
+
+.metric-item.highlight {
+    background: linear-gradient(135deg, rgba(0, 255, 170, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+.metric-value.positive {
+    color: var(--accent-green);
+}
+
+.metric-value.negative {
+    color: var(--accent-red);
+}
+
+/* 右侧分布图 */
+.stats-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.distribution-header {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.distribution-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.distribution-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.distribution-bar {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.distribution-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+.distribution-progress {
+    height: 24px;
+    background-color: rgba(0, 255, 170, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.distribution-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+    border-radius: 12px;
+}
+
+.distribution-fill.long {
+    background: linear-gradient(90deg, var(--accent-green) 0%, rgba(0, 255, 170, 0.7) 100%);
+}
+
+.distribution-fill.short {
+    background: linear-gradient(90deg, var(--accent-red) 0%, rgba(255, 0, 0, 0.7) 100%);
+}
+
+.distribution-fill.flat {
+    background: linear-gradient(90deg, var(--accent-yellow) 0%, rgba(255, 255, 0, 0.7) 100%);
+}
+
+.distribution-value {
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-align: left;
+}
+
+.distribution-value.long {
+    color: var(--accent-green);
+}
+
+.distribution-value.short {
+    color: var(--accent-red);
+}
+
+.distribution-value.flat {
+    color: var(--accent-yellow);
+}
+
+/* Trading Statistics Section */
+.stats-section {
+    grid-column: 1 / 3;
+    grid-row: 2 / 3;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+}
+
+.stats-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stats-title {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stats-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+/* 左侧指标区域 */
+.stats-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.metric-row:last-child {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.metric-item:hover {
+    border-color: var(--text-dim);
+}
+
+.metric-item.highlight {
+    background: linear-gradient(135deg, rgba(0, 255, 170, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+.metric-value.positive {
+    color: var(--accent-green);
+}
+
+.metric-value.negative {
+    color: var(--accent-red);
+}
+
+/* 右侧分布图 */
+.stats-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.distribution-header {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.distribution-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.distribution-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.distribution-bar {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.distribution-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+.distribution-progress {
+    height: 24px;
+    background-color: rgba(0, 255, 170, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.distribution-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+    border-radius: 12px;
+}
+
+.distribution-fill.long {
+    background: linear-gradient(90deg, var(--accent-green) 0%, rgba(0, 255, 170, 0.7) 100%);
+}
+
+.distribution-fill.short {
+    background: linear-gradient(90deg, var(--accent-red) 0%, rgba(255, 0, 0, 0.7) 100%);
+}
+
+.distribution-fill.flat {
+    background: linear-gradient(90deg, var(--accent-yellow) 0%, rgba(255, 255, 0, 0.7) 100%);
+}
+
+.distribution-value {
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-align: left;
+}
+
+.distribution-value.long {
+    color: var(--accent-green);
+}
+
+.distribution-value.short {
+    color: var(--accent-red);
+}
+
+.distribution-value.flat {
+    color: var(--accent-yellow);
+}
+
+/* Trading Statistics Section */
+.stats-section {
+    grid-column: 1 / 3;
+    grid-row: 2 / 3;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+}
+
+.stats-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stats-title {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stats-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+/* 左侧指标区域 */
+.stats-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.metric-row:last-child {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.metric-item:hover {
+    border-color: var(--text-dim);
+}
+
+.metric-item.highlight {
+    background: linear-gradient(135deg, rgba(0, 255, 170, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+.metric-value.positive {
+    color: var(--accent-green);
+}
+
+.metric-value.negative {
+    color: var(--accent-red);
+}
+
+/* 右侧分布图 */
+.stats-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.distribution-header {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.distribution-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.distribution-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.distribution-bar {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.distribution-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+.distribution-progress {
+    height: 24px;
+    background-color: rgba(0, 255, 170, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.distribution-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+    border-radius: 12px;
+}
+
+.distribution-fill.long {
+    background: linear-gradient(90deg, var(--accent-green) 0%, rgba(0, 255, 170, 0.7) 100%);
+}
+
+.distribution-fill.short {
+    background: linear-gradient(90deg, var(--accent-red) 0%, rgba(255, 0, 0, 0.7) 100%);
+}
+
+.distribution-fill.flat {
+    background: linear-gradient(90deg, var(--accent-yellow) 0%, rgba(255, 255, 0, 0.7) 100%);
+}
+
+.distribution-value {
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-align: left;
+}
+
+.distribution-value.long {
+    color: var(--accent-green);
+}
+
+.distribution-value.short {
+    color: var(--accent-red);
+}
+
+.distribution-value.flat {
+    color: var(--accent-yellow);
+}
+
 /* Account Section - Binance Style */
 .account-section {
     grid-column: 2 / 3;
@@ -320,7 +1159,7 @@ body {
 }
 
 .account-main-value {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0rem;
 }
 
 .main-value-row {
@@ -431,7 +1270,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.8rem;
 }
 
 .equity-label {
@@ -487,7 +1326,7 @@ body {
 /* Positions Section */
 .positions-section {
     grid-column: 1 / 3;
-    grid-row: 3 / 4;
+    grid-row: 4 / 5;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 1.5rem;
@@ -525,6 +1364,7 @@ body {
 }
 
 .positions-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
     transition: background-color 0.2s ease;
 }
 
@@ -570,7 +1410,7 @@ body {
 /* Trades Section */
 .trades-section {
     grid-column: 1 / 3;
-    grid-row: 4 / 5;
+    grid-row: 5 / 6;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 1.5rem;
@@ -630,9 +1470,9 @@ body {
 }
 
 .trades-table td {
-    padding: 0.9rem 1rem;
-    /* color: var(--text-primary); */
-    white-space: nowrap;
+    padding: 0.8rem;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .trades-table .side-badge {
@@ -898,30 +1738,45 @@ body {
         min-height: 400px;
     }
 
+    /* 统计信息 */
+    .stats-section {
+        grid-column: 1 / 2;
+        grid-row: 2 / 3;
+        flex-direction: column;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .hold-times-card {
+        width: 100%;
+    }
+
     /* 账户信息 */
     .account-section {
         grid-column: 1 / 2;
-        grid-row: 2 / 3;
+        grid-row: 3 / 4;
         min-height: auto;
     }
 
     /* AI 决策 */
     .chart-section:nth-child(2) {
         grid-column: 1 / 2;
-        grid-row: 3 / 4;
+        grid-row: 4 / 5;
         min-height: 400px;
     }
 
     /* 持仓 */
     .positions-section {
         grid-column: 1 / 2;
-        grid-row: 4 / 5;
+        grid-row: 5 / 6;
     }
 
     /* 交易历史 */
     .trades-section {
         grid-column: 1 / 2;
-        grid-row: 5 / 6;
+        grid-row: 6 / 7;
     }
 }
 
@@ -1005,6 +1860,69 @@ body {
 
     .decision-text {
         font-size: 0.8rem;
+    }
+
+    /* Stats Section */
+    .stats-section {
+        padding: 1rem;
+    }
+    
+    .stats-content {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .metric-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .metric-row:last-child {
+        grid-template-columns: 1fr;
+    }
+    
+    .metric-item {
+        padding: 0.8rem;
+    }
+    
+    .metric-label {
+        font-size: 0.7rem;
+    }
+    
+    .metric-value {
+        font-size: 1.4rem;
+    }
+    
+    .stats-distribution {
+        padding: 0.8rem;
+    }
+    
+    .distribution-bar {
+        grid-template-columns: 50px 1fr 50px;
+        gap: 0.5rem;
+    }
+    
+    .distribution-label {
+        font-size: 0.75rem;
+    }
+    
+    .distribution-progress {
+        height: 20px;
+    }
+    
+    .distribution-value {
+        font-size: 0.8rem;
+    }
+    
+    .hold-times-grid {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .hold-time-item {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
     }
 
     /* Account Section */

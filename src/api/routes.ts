@@ -43,21 +43,23 @@ export function createApiRoutes() {
   /**
    * 获取账户总览
    * 
-   * Gate.io 账户结构：
-   * - account.total = available + positionMargin + unrealisedPnl
-   * - account.total 包含未实现盈亏
+   * 账户结构说明：
+   * Binance USDT-M：
+   * - totalWalletBalance: 钱包总余额（包含未实现盈亏）
+   * - availableBalance: 可用余额
+   * - totalInitialMargin: 所有持仓的起始保证金之和
+   * - totalMaintMargin: 所有持仓的维持保证金之和
+   * - totalUnrealizedProfit: 未实现盈亏
    * 
-   * 总资产计算：
-   * - totalBalance = total - unrealisedPnl = available + positionMargin
-   * - 总资产不包含未实现盈亏
-   * 
-   * 监控页面显示：
-   * - 总资产显示 = totalBalance + unrealisedPnl（实时反映持仓盈亏）
+   * Gate.io：
+   * - total = available + positionMargin + unrealisedPnl
+   * - total 包含未实现盈亏
    */
   app.get("/api/account", async (c) => {
     try {
-      const gateClient = createTradingClient();
-      const account = await gateClient.getFuturesAccount();
+      const EXCHANGE_TYPE = process.env.EXCHANGE_TYPE || 'binance';
+      const tradingClient = createTradingClient();
+      const account = await tradingClient.getFuturesAccount();
       
       // 从数据库获取初始资金
       const initialResult = await dbClient.execute(
@@ -67,37 +69,79 @@ export function createApiRoutes() {
         ? Number.parseFloat(initialResult.rows[0].total_value as string)
         : 100;
       
-      // 统一字段名处理（兼容 Binance 和 Gate.io）
-      // Binance: total, available, unrealizedPnl, initialMargin
-      // Gate.io: total, available, unrealised_pnl/unrealisedPnl, position_margin/positionMargin
-      const total = Number.parseFloat(account.total || "0");
-      const available = Number.parseFloat(account.available || "0");
-      const positionMargin = Number.parseFloat(
-        account.initialMargin || account.position_margin || account.positionMargin || "0"
-      );
-      const unrealisedPnl = Number.parseFloat(
-        account.unrealizedPnl || account.unrealised_pnl || account.unrealisedPnl || "0"
-      );
+      let totalBalance: number;
+      let available: number;
+      let positionMargin: number;
+      let unrealisedPnl: number;
+      let maintenanceMargin: number;
+      let marginBalance: number;
+      let marginRatio: number;
       
-      // 总资产计算
-      // Binance: total 已经不包含未实现盈亏，total = available + initialMargin
-      // Gate.io: total 包含未实现盈亏，需要减去 unrealisedPnl
-      const totalBalance = total;
+      if (EXCHANGE_TYPE === 'binance') {
+        // === Binance U本位合约精确计算 ===
+        // binanceClient 已经返回了映射后的字段
+        
+        // 总资产（从 account.total 获取，这是 totalWalletBalance）
+        totalBalance = Number.parseFloat(account.total || "0");
+        
+        // 可用余额
+        available = Number.parseFloat(account.available || "0");
+        
+        // 起始保证金（所有持仓占用的保证金）
+        positionMargin = Number.parseFloat(account.initialMargin || "0");
+        
+        // 未实现盈亏
+        unrealisedPnl = Number.parseFloat(account.unrealizedPnl || "0");
+        
+        // 维持保证金（所有持仓的维持保证金之和）
+        maintenanceMargin = Number.parseFloat(account.maintenanceMargin || "0");
+        
+        // 保证金余额（从 marginBalance 字段获取，这是 totalMarginBalance）
+        marginBalance = Number.parseFloat(account.marginBalance || totalBalance || "0");
+        
+        // 保证金比例 = 维持保证金 / 保证金余额（按 Binance 口径）
+        // 当保证金比例达到100%时会被强平
+        marginRatio = marginBalance > 0 ? (maintenanceMargin / marginBalance) * 100 : 0;
+        
+        // logger.info(`Binance账户数据: 钱包余额=${totalBalance.toFixed(2)}, 可用=${available.toFixed(2)}, 起始保证金=${positionMargin.toFixed(2)}, 维持保证金=${maintenanceMargin.toFixed(2)}, 保证金余额=${marginBalance.toFixed(2)}, 保证金比例=${marginRatio.toFixed(2)}%`);
+        
+      } else {
+        // === Gate.io 或其他交易所 ===
+        const total = Number.parseFloat(account.total || "0");
+        available = Number.parseFloat(account.available || "0");
+        positionMargin = Number.parseFloat(
+          account.initialMargin || account.position_margin || account.positionMargin || "0"
+        );
+        unrealisedPnl = Number.parseFloat(
+          account.unrealizedPnl || account.unrealised_pnl || account.unrealisedPnl || "0"
+        );
+        
+        // Gate.io: total 包含未实现盈亏，需要减去
+        totalBalance = total - unrealisedPnl;
+        
+        // Gate.io 维持保证金估算（10%）
+        maintenanceMargin = positionMargin * 0.1;
+        marginBalance = totalBalance;
+        marginRatio = marginBalance > 0 ? (maintenanceMargin / marginBalance) * 100 : 0;
+      }
       
       // 收益率 = (总资产 - 初始资金) / 初始资金 * 100
-      // 总资产不包含未实现盈亏，收益率反映已实现盈亏
       const returnPercent = ((totalBalance - initialBalance) / initialBalance) * 100;
       
       return c.json({
-        totalBalance,  // 总资产（不包含未实现盈亏）
+        totalBalance,           // 总资产（钱包余额，不包含未实现盈亏）
         availableBalance: available,
-        positionMargin,
+        positionMargin,         // 起始保证金/持仓保证金
+        maintenanceMargin,      // 维持保证金（精确值）
+        marginBalance,          // 保证金余额（用于计算比例）
+        marginRatio,            // 保证金比例（%）
         unrealisedPnl,
-        returnPercent,  // 收益率（不包含未实现盈亏）
+        returnPercent,
         initialBalance,
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
+      logger.error("获取账户信息失败:", error);
       return c.json({ error: error.message }, 500);
     }
   });
@@ -308,6 +352,67 @@ export function createApiRoutes() {
       );
       const maxLoss = (maxLossResult.rows[0] as any).max_loss || 0;
       
+      // 计算平均杠杆 - 从所有开仓交易中计算
+      const avgLeverageResult = await dbClient.execute(
+        "SELECT AVG(CAST(leverage AS REAL)) as avg_leverage FROM trades WHERE type = 'open'"
+      );
+      const avgLeverage = (avgLeverageResult.rows[0] as any).avg_leverage || 0;
+      
+      // 获取持仓时间分布统计
+      const tradesWithTimeResult = await dbClient.execute(
+        `SELECT o.side, o.timestamp as open_time, c.timestamp as close_time
+         FROM trades o
+         JOIN trades c ON o.symbol = c.symbol AND o.order_id != c.order_id
+         WHERE o.type = 'open' AND c.type = 'close' 
+         AND c.timestamp > o.timestamp
+         AND c.pnl IS NOT NULL
+         ORDER BY o.timestamp DESC`
+      );
+      
+      let longCount = 0;
+      let shortCount = 0;
+      const rows = tradesWithTimeResult.rows;
+      
+      for (const row of rows) {
+        const rowData = row as any;
+        if (rowData.side === 'long') {
+          longCount++;
+        } else if (rowData.side === 'short') {
+          shortCount++;
+        }
+      }
+      
+      const totalPositions = longCount + shortCount;
+      const longPercent = totalPositions > 0 ? (longCount / totalPositions) * 100 : 0;
+      const shortPercent = totalPositions > 0 ? (shortCount / totalPositions) * 100 : 0;
+      const flatPercent = 100 - longPercent - shortPercent; // 平仓状态时间
+      
+      // 计算夏普比率 (Sharpe Ratio)
+      // 夏普比率 = (平均收益 - 无风险收益率) / 收益标准差
+      let sharpeRatio = 0;
+      if (totalTrades > 0) {
+        // 获取所有已平仓交易的盈亏
+        const pnlListResult = await dbClient.execute(
+          "SELECT pnl FROM trades WHERE type = 'close' AND pnl IS NOT NULL ORDER BY timestamp DESC"
+        );
+        
+        if (pnlListResult.rows.length > 1) {
+          const pnls = pnlListResult.rows.map((row: any) => Number.parseFloat(row.pnl || "0"));
+          
+          // 计算平均收益
+          const avgPnl = pnls.reduce((sum, pnl) => sum + pnl, 0) / pnls.length;
+          
+          // 计算标准差
+          const variance = pnls.reduce((sum, pnl) => sum + Math.pow(pnl - avgPnl, 2), 0) / pnls.length;
+          const stdDev = Math.sqrt(variance);
+          
+          // 计算夏普比率（假设无风险收益率为0）
+          if (stdDev > 0) {
+            sharpeRatio = avgPnl / stdDev;
+          }
+        }
+      }
+      
       return c.json({
         totalTrades,
         winTrades,
@@ -316,6 +421,13 @@ export function createApiRoutes() {
         totalPnl,
         maxWin,
         maxLoss,
+        avgLeverage: Number(avgLeverage.toFixed(1)),
+        sharpeRatio: Number(sharpeRatio.toFixed(2)),
+        holdTimes: {
+          long: Number(longPercent.toFixed(1)),
+          short: Number(shortPercent.toFixed(1)),
+          flat: Number(flatPercent.toFixed(1)),
+        },
       });
     } catch (error: any) {
       return c.json({ error: error.message }, 500);
