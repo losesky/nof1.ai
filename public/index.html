@@ -176,112 +176,137 @@
         <h3 class="stats-title" id="stats-title">交易统计</h3>
       </div>
       
-      <div class="stats-compact-layout">
-        <!-- 左侧：数据列表 -->
-        <div class="stats-data-list">
-          <div class="stats-data-row">
-            <span class="stats-data-label">交易次数</span>
-            <span class="stats-data-value" id="total-trades">--</span>
-          </div>
-          <div class="stats-data-row">
-            <span class="stats-data-label">胜率</span>
-            <span class="stats-data-value" id="win-rate">--</span>
-          </div>
-          <div class="stats-data-row">
-            <span class="stats-data-label">平均杠杆</span>
-            <span class="stats-data-value" id="avg-leverage">--</span>
-          </div>
-          <div class="stats-data-row">
-            <span class="stats-data-label">夏普比率</span>
-            <span class="stats-data-value" id="sharpe-ratio">--</span>
-          </div>
-          <div class="stats-data-row highlight">
-            <span class="stats-data-label">总盈亏</span>
-            <span class="stats-data-value" id="total-pnl">--</span>
-          </div>
-          <div class="stats-data-row">
-            <span class="stats-data-label">总手续费</span>
-            <span class="stats-data-value" id="total-fees">--</span>
-          </div>
-          <div class="stats-data-row">
-            <span class="stats-data-label">最大盈利</span>
-            <span class="stats-data-value positive" id="biggest-win">--</span>
-          </div>
-          <div class="stats-data-row">
-            <span class="stats-data-label">最大亏损</span>
-            <span class="stats-data-value negative" id="biggest-loss">--</span>
-          </div>
-          
-          <!-- 持仓时间分布 -->
-          <div class="stats-hold-times">
-            <div class="hold-time-title">持仓时间分布</div>
-            <div class="hold-time-row">
-              <span class="hold-label long">做多</span>
-              <span class="hold-value long" id="hold-time-long">--</span>
+      <!-- KPI 条：核心指标一眼可见 -->
+      <div class="stats-kpi-strip">
+        <div class="kpi-item">
+          <div class="kpi-label">总盈亏</div>
+          <div class="kpi-value" id="kpi-total-pnl">--</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">胜率</div>
+          <div class="kpi-value" id="kpi-win-rate">--</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">夏普比率</div>
+          <div class="kpi-value" id="kpi-sharpe">--</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">交易次数</div>
+          <div class="kpi-value" id="kpi-total-trades">--</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">最大回撤</div>
+          <div class="kpi-value negative" id="kpi-max-dd">--</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">单笔平均盈亏</div>
+          <div class="kpi-value" id="kpi-avg-pnl">--</div>
+        </div>
+      </div>
+
+      <!-- 指标栈：二级指标两列网格 -->
+      <div class="stats-metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">平均杠杆</div>
+          <div class="metric-value" id="metric-avg-leverage">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">总手续费</div>
+          <div class="metric-value" id="metric-total-fees">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">最大盈利</div>
+          <div class="metric-value positive" id="metric-biggest-win">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">最大亏损</div>
+          <div class="metric-value negative" id="metric-biggest-loss">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">平均持仓时长</div>
+          <div class="metric-value" id="metric-avg-holding">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">利润因子</div>
+          <div class="metric-value" id="metric-profit-factor">--</div>
+        </div>
+      </div>
+
+      <!-- 分布：方向分布 + 交易对偏好（紧凑版） -->
+      <div class="stats-distributions">
+        <!-- 方向分布 - 单行显示 -->
+        <div class="distribution-block direction">
+          <div class="distribution-title">方向分布</div>
+          <div class="direction-inline">
+            <div class="direction-item">
+              <span class="direction-dot long"></span>
+              <span class="direction-label">做多</span>
+              <span class="direction-value long" id="direction-long-value">--</span>
             </div>
-            <div class="hold-time-row">
-              <span class="hold-label short">做空</span>
-              <span class="hold-value short" id="hold-time-short">--</span>
+            <div class="direction-item">
+              <span class="direction-dot short"></span>
+              <span class="direction-label">做空</span>
+              <span class="direction-value short" id="direction-short-value">--</span>
             </div>
-            <div class="hold-time-row">
-              <span class="hold-label flat">空仓</span>
-              <span class="hold-value flat" id="hold-time-flat">--</span>
+            <div class="direction-item">
+              <span class="direction-dot flat"></span>
+              <span class="direction-label">空仓</span>
+              <span class="direction-value flat" id="direction-flat-value">--</span>
             </div>
           </div>
         </div>
-        
-        <!-- 右侧：交易偏好饼图 -->
-        <div class="stats-chart-area">
-          <div class="stats-chart-title">交易偏好</div>
-          <div class="stats-chart-container">
-            <canvas id="tradingPairsChart" width="280" height="280"></canvas>
-          </div>
-          <div class="stats-pairs-legend" id="pairsLegend">
-            <!-- 动态生成图例 -->
+        <!-- 交易对偏好 - 紧凑列表 -->
+        <div class="distribution-block pairs">
+          <div class="distribution-title">交易对偏好（Top 5）<span class="distribution-subtitle" id="pairs-concentration"></span></div>
+          <div class="pairs-compact-list" id="pairsList">
+            <div class="empty-state">暂无数据</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Account Value Section -->
+    <!-- Account Value Section - Optimized -->
     <section class="account-section">
-      <div class="chart-header">
-        <h3 class="chart-title">账户</h3>
+      <div class="account-header">
+        <h3 class="account-title">账户总览</h3>
       </div>
-      <div class="account-main-value">
-        <div class="main-value-row">
-          <span class="main-value-label">保证金比例</span>
-          <span class="main-value-icon">💰 <span id="roi-percent">--</span></span>
-        </div>
-        <div class="main-equity-section">
-          <div class="equity-item">
-            <span class="equity-label-small">维持保证金</span>
-            <span class="equity-value-small" id="maintenance-margin">-- USDT</span>
-          </div>
-          <div class="equity-item">
-            <span class="equity-label-small">保证金余额</span>
-            <span class="equity-value-small" id="margin-balance">-- USDT</span>
-          </div>
-        </div>
-        <div class="wallet-usage-section">
-          <div class="usage-header">
-            <span class="usage-label">钱包余额使用</span>
-            <span class="usage-toggle">单币种保证金模式</span>
-          </div>
-        </div>
-        <div class="total-equity-row">
-          <span class="equity-label">总权益</span>
-          <span class="equity-value" id="total-equity">-- USDT</span>
+      
+      <!-- 总权益 -->
+      <div class="account-equity-block">
+        <div class="equity-icon">💰</div>
+        <div class="equity-info">
+          <!-- <div class="equity-label">总权益</div> -->
+          <div class="equity-main-value" id="total-equity">加载中...</div>
+          <!-- <div class="equity-usd-value" id="total-equity-usd">≈ $--</div> -->
         </div>
       </div>
-      <div class="account-details-grid">
-        <div class="detail-row">
-          <span class="detail-label">钱包余额</span>
-          <span class="detail-value" id="wallet-balance">-- USDT</span>
+      
+      <!-- 风险指标 -->
+      <div class="account-risk-section">
+        <div class="risk-header">📊 风险指标</div>
+        <div class="risk-metrics">
+          <div class="risk-metric-item">
+            <span class="risk-metric-label">保证金比率</span>
+            <span class="risk-metric-value" id="margin-ratio">加载中...</span>
+            <!-- <span class="risk-status-badge" id="risk-badge">--</span> -->
+          </div>
+          <div class="risk-metric-item">
+            <span class="risk-metric-label">可用余额</span>
+            <span class="risk-metric-value" id="available-balance">加载中...</span>
+          </div>
+          <div class="risk-metric-item">
+            <span class="risk-metric-label">未实现盈亏</span>
+            <span class="risk-metric-value pnl" id="unrealised-pnl">加载中...</span>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">未实现盈亏</span>
-          <span class="detail-value pnl" id="unrealised-pnl">-- USDT</span>
+      </div>
+      
+      <!-- 风险状态条 -->
+      <div class="account-risk-status" id="risk-status-bar">
+        <div class="risk-status-icon" id="risk-icon">✅</div>
+        <div class="risk-status-text">
+          <div class="risk-status-label" id="risk-status-label">风险状态: 安全</div>
+          <div class="risk-status-tip">保证金比率低于50%为安全，超过80%需警惕</div>
         </div>
       </div>
     </section>

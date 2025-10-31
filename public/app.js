@@ -127,7 +127,7 @@ async function loadAccountData() {
         updateValueWithAnimation('total-equity', totalEquity.toFixed(4) + ' USDT');
         
         // 更新总权益（美元显示，与USDT相同）
-        updateValueWithAnimation('total-equity-usd', totalEquity.toFixed(4) + ' USDT');
+        // updateValueWithAnimation('total-equity-usd', totalEquity.toFixed(4) + ' USDT');
         
         // 更新钱包余额（可用余额 + 持仓保证金）
         const walletBalance = data.availableBalance + data.positionMargin;

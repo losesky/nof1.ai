@@ -68,55 +68,90 @@ class TradingMonitor {
             // 计算总权益（总资产 + 未实现盈亏）
             const totalEquity = data.totalBalance + data.unrealisedPnl;
             
-            // 更新保证金比例（从后端获取精确值）
-            const roiPercentEl = document.getElementById('roi-percent');
-            if (roiPercentEl) {
-                // 使用后端返回的保证金比例（marginRatio）
-                const marginRatio = data.marginRatio || 0;
-                const roiValue = marginRatio.toFixed(2) + '%';
-                roiPercentEl.textContent = roiValue;
-                // 保证金比例越高风险越大，接近100%会被强平
-                roiPercentEl.className = marginRatio < 50 ? 'positive' : (marginRatio < 80 ? 'warning' : 'negative');
-            }
-            
-            // 更新维持保证金（使用后端返回的精确值）
-            const maintenanceMarginEl = document.getElementById('maintenance-margin');
-            if (maintenanceMarginEl) {
-                const maintenanceMargin = data.maintenanceMargin || 0;
-                maintenanceMarginEl.textContent = maintenanceMargin.toFixed(4) + ' USDT';
-            }
-            
-            // 更新保证金余额（使用后端返回的精确值）
-            const marginBalanceEl = document.getElementById('margin-balance');
-            if (marginBalanceEl) {
-                const marginBalance = data.marginBalance || data.totalBalance;
-                marginBalanceEl.textContent = marginBalance.toFixed(4) + ' USDT';
-            }
-            
             // 更新总权益
             const totalEquityEl = document.getElementById('total-equity');
             if (totalEquityEl) {
-                totalEquityEl.textContent = totalEquity.toFixed(4) + ' USDT';
+                totalEquityEl.textContent = totalEquity.toFixed(2) + ' USDT';
             }
             
-            // 更新总权益（美元显示，与USDT相同）
+            // 更新总权益（美元显示）
             const totalEquityUsdEl = document.getElementById('total-equity-usd');
             if (totalEquityUsdEl) {
-                totalEquityUsdEl.textContent = totalEquity.toFixed(4) + ' USDT';
+                totalEquityUsdEl.textContent = '≈ $' + totalEquity.toFixed(2);
             }
             
-            // 更新钱包余额（总资产，不含未实现盈亏）
-            const walletBalanceEl = document.getElementById('wallet-balance');
-            if (walletBalanceEl) {
-                walletBalanceEl.textContent = data.totalBalance.toFixed(4) + ' USDT';
+            // 计算保证金比率（使用后端返回的精确值）
+            const marginRatio = data.marginRatio || 0;
+            
+            // 更新保证金比率
+            const marginRatioEl = document.getElementById('margin-ratio');
+            if (marginRatioEl) {
+                marginRatioEl.textContent = marginRatio.toFixed(2) + '%';
+                // 根据比率设置颜色
+                if (marginRatio < 50) {
+                    marginRatioEl.className = 'risk-metric-value';
+                    marginRatioEl.style.color = 'var(--accent-green)';
+                } else if (marginRatio < 80) {
+                    marginRatioEl.className = 'risk-metric-value';
+                    marginRatioEl.style.color = 'var(--accent-yellow)';
+                } else {
+                    marginRatioEl.className = 'risk-metric-value';
+                    marginRatioEl.style.color = 'var(--accent-red)';
+                }
+            }
+            
+            // 更新风险状态徽章
+            // const riskBadgeEl = document.getElementById('risk-badge');
+            // if (riskBadgeEl) {
+            //     if (marginRatio < 50) {
+            //         riskBadgeEl.textContent = '安全';
+            //         riskBadgeEl.className = 'risk-status-badge safe';
+            //     } else if (marginRatio < 80) {
+            //         riskBadgeEl.textContent = '警惕';
+            //         riskBadgeEl.className = 'risk-status-badge warning';
+            //     } else {
+            //         riskBadgeEl.textContent = '危险';
+            //         riskBadgeEl.className = 'risk-status-badge danger';
+            //     }
+            // }
+            
+            // 更新可用余额（使用availableBalance字段）
+            const availableBalanceEl = document.getElementById('available-balance');
+            if (availableBalanceEl) {
+                const availableBalance = data.availableBalance || data.totalBalance;
+                availableBalanceEl.textContent = availableBalance.toFixed(2) + ' USDT';
             }
             
             // 更新未实现盈亏（带符号和颜色）
             const unrealisedPnlEl = document.getElementById('unrealised-pnl');
             if (unrealisedPnlEl) {
-                const pnlValue = (data.unrealisedPnl >= 0 ? '' : '') + data.unrealisedPnl.toFixed(4) + ' USDT';
+                const pnlValue = (data.unrealisedPnl >= 0 ? '+' : '') + data.unrealisedPnl.toFixed(2) + ' USDT';
                 unrealisedPnlEl.textContent = pnlValue;
-                unrealisedPnlEl.className = 'detail-value pnl ' + (data.unrealisedPnl >= 0 ? 'positive' : 'negative');
+                unrealisedPnlEl.className = 'risk-metric-value pnl ' + (data.unrealisedPnl >= 0 ? 'positive' : 'negative');
+            }
+            
+            // 更新风险状态条
+            const riskStatusBarEl = document.getElementById('risk-status-bar');
+            const riskIconEl = document.getElementById('risk-icon');
+            const riskStatusLabelEl = document.getElementById('risk-status-label');
+            
+            if (riskStatusBarEl && riskIconEl && riskStatusLabelEl) {
+                // 移除之前的状态类
+                riskStatusBarEl.classList.remove('safe', 'warning', 'danger');
+                
+                if (marginRatio < 50) {
+                    riskStatusBarEl.classList.add('safe');
+                    riskIconEl.textContent = '✅';
+                    riskStatusLabelEl.textContent = '风险状态: 安全';
+                } else if (marginRatio < 80) {
+                    riskStatusBarEl.classList.add('warning');
+                    riskIconEl.textContent = '⚠️';
+                    riskStatusLabelEl.textContent = '风险状态: 警惕';
+                } else {
+                    riskStatusBarEl.classList.add('danger');
+                    riskIconEl.textContent = '🚨';
+                    riskStatusLabelEl.textContent = '风险状态: 危险';
+                }
             }
             
         } catch (error) {
@@ -402,212 +437,166 @@ class TradingMonitor {
         });
     }
 
-    // 加载交易统计数据
+    // 工具：数值格式化与类名设置
+    fmtMoney(n, digits = 2) {
+        if (n === null || n === undefined || Number.isNaN(n)) return '--';
+        const sign = n > 0 ? '+' : (n < 0 ? '-' : '');
+        const abs = Math.abs(n).toFixed(digits).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return sign + '$' + abs;
+    }
+    fmtPct(n, digits = 1) {
+        if (n === null || n === undefined || Number.isNaN(n)) return '--';
+        return n.toFixed(digits) + '%';
+    }
+    fmtSharpe(n) {
+        if (n === null || n === undefined || Number.isNaN(n)) return '--';
+        const d = Math.abs(n) < 1 ? 4 : 2;
+        return n.toFixed(d);
+    }
+    fmtDuration(ms) {
+        if (!ms || ms <= 0) return '--';
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        if (h > 0) return `${h}小时${m}分`;
+        return `${m}分钟`;
+    }
+    setSignClass(el, value, baseClass) {
+        if (!el) return;
+        const signClass = value > 0 ? 'positive' : (value < 0 ? 'negative' : '');
+        el.className = `${baseClass || el.className}`.split(' ')[0] + (signClass ? ' ' + signClass : '');
+    }
+
+    // 渲染：KPI条
+    renderKpi(data) {
+        const totalPnl = data.totalPnl ?? 0;
+        const totalTrades = data.totalTrades ?? 0;
+        const avgPnl = totalTrades > 0 ? (totalPnl / totalTrades) : null;
+
+        const kpiTotalPnl = document.getElementById('kpi-total-pnl');
+        if (kpiTotalPnl) {
+            kpiTotalPnl.textContent = this.fmtMoney(totalPnl);
+            this.setSignClass(kpiTotalPnl, totalPnl, 'kpi-value');
+        }
+        const kpiWinRate = document.getElementById('kpi-win-rate');
+        if (kpiWinRate) kpiWinRate.textContent = this.fmtPct(data.winRate ?? null, 1);
+        const kpiSharpe = document.getElementById('kpi-sharpe');
+        if (kpiSharpe) kpiSharpe.textContent = this.fmtSharpe(data.sharpeRatio ?? null);
+        const kpiTotalTrades = document.getElementById('kpi-total-trades');
+        if (kpiTotalTrades) kpiTotalTrades.textContent = totalTrades;
+        const kpiAvgPnl = document.getElementById('kpi-avg-pnl');
+        if (kpiAvgPnl) {
+            kpiAvgPnl.textContent = avgPnl === null ? '--' : this.fmtMoney(avgPnl);
+            if (avgPnl !== null) this.setSignClass(kpiAvgPnl, avgPnl, 'kpi-value');
+        }
+        // 新增：最大回撤（负向越大越差）
+        const kpiMaxDd = document.getElementById('kpi-max-dd');
+        if (kpiMaxDd) {
+            const dd = data.maxDrawdown; // 期望为百分比数值 0-100 或 -xx
+            if (dd === null || dd === undefined || Number.isNaN(dd)) {
+                kpiMaxDd.textContent = '--';
+            } else {
+                const val = typeof dd === 'number' ? dd : Number(dd);
+                const pct = (val <= 0 ? Math.abs(val) : val).toFixed(1) + '%';
+                kpiMaxDd.textContent = '-' + pct;
+                kpiMaxDd.classList.add('negative');
+            }
+        }
+    }
+
+    // 渲染：指标栈
+    renderMetrics(data) {
+        const avgLevEl = document.getElementById('metric-avg-leverage');
+        if (avgLevEl) avgLevEl.textContent = (data.avgLeverage ?? null) !== null ? (data.avgLeverage).toFixed(1) + 'x' : '--';
+
+        const feesEl = document.getElementById('metric-total-fees');
+        if (feesEl) feesEl.textContent = this.fmtMoney(data.totalFees ?? 0);
+
+        const maxWinEl = document.getElementById('metric-biggest-win');
+        if (maxWinEl) {
+            const v = data.maxWin ?? 0;
+            maxWinEl.textContent = this.fmtMoney(Math.abs(v));
+            this.setSignClass(maxWinEl, v || 1, 'metric-value');
+        }
+        const maxLossEl = document.getElementById('metric-biggest-loss');
+        if (maxLossEl) {
+            const v = -(Math.abs(data.maxLoss ?? 0));
+            maxLossEl.textContent = this.fmtMoney(v);
+            this.setSignClass(maxLossEl, v, 'metric-value');
+        }
+
+        const avgHoldingEl = document.getElementById('metric-avg-holding');
+        const avgHoldingMs = data.avgHoldingMs ?? data.averageHoldingMs ?? null;
+        if (avgHoldingEl) avgHoldingEl.textContent = this.fmtDuration(avgHoldingMs);
+
+        const pfEl = document.getElementById('metric-profit-factor');
+        if (pfEl) pfEl.textContent = (data.profitFactor !== undefined && data.profitFactor !== null) ? data.profitFactor.toFixed(2) : '--';
+    }
+
+    // 渲染：方向分布与交易对偏好
+    renderDistributions(data) {
+        // 方向分布 - 单行显示（不再需要进度条）
+        const ht = data.holdTimes || {};
+        const lp = Number(ht.long || 0).toFixed(1);
+        const sp = Number(ht.short || 0).toFixed(1);
+        const fp = Number(ht.flat || 0).toFixed(1);
+        const longVal = document.getElementById('direction-long-value');
+        const shortVal = document.getElementById('direction-short-value');
+        const flatVal = document.getElementById('direction-flat-value');
+        if (longVal) longVal.textContent = lp + '%';
+        if (shortVal) shortVal.textContent = sp + '%';
+        if (flatVal) flatVal.textContent = fp + '%';
+
+        // 交易对偏好 Top5 紧凑列表
+        this.renderPairsList(data.tradingPairs || []);
+    }
+
+    renderPairsList(pairs) {
+        const list = document.getElementById('pairsList');
+        const concentrationEl = document.getElementById('pairs-concentration');
+        if (!list) return;
+        if (!pairs || pairs.length === 0) {
+            list.innerHTML = '<div class="empty-state">暂无数据</div>';
+            if (concentrationEl) concentrationEl.textContent = '';
+            return;
+        }
+        // 归一化并排序
+        const norm = pairs.map(p => ({ symbol: p.symbol, percentage: Number(p.percentage) || 0 }))
+                          .sort((a,b) => b.percentage - a.percentage);
+        const top5 = norm.slice(0, 5);
+        const other = Math.max(0, 100 - top5.reduce((s, p) => s + p.percentage, 0));
+        if (other > 0.5) top5.push({ symbol: 'Other', percentage: Number(other.toFixed(2)) });
+
+        // 紧凑列表：币种 + 百分比
+        list.innerHTML = top5.map(p => `
+            <div class="pair-compact-item">
+              <span class="pair-symbol">${p.symbol}</span>
+              <span class="pair-percentage">${p.percentage.toFixed(2)}%</span>
+            </div>
+        `).join('');
+
+        // HHI 集中度
+        const allPercents = norm.map(p => p.percentage);
+        const hhi = allPercents.reduce((s, x) => s + Math.pow(x/100, 2), 0);
+        let level = '分散';
+        if (hhi >= 0.25) level = '集中'; else if (hhi >= 0.15) level = '中等';
+        if (concentrationEl) concentrationEl.textContent = `HHI ${hhi.toFixed(2)} · ${level}`;
+    }
+
+    // 加载交易统计数据（重写）
     async loadStatsData() {
         try {
             const response = await fetch('/api/stats');
             const data = await response.json();
-            
-            // 调试日志
-            console.log('Stats API Response:', data);
-            console.log('Sharpe Ratio:', data.sharpeRatio);
-            
             if (data.error) {
                 console.error('获取统计数据失败:', data.error);
                 return;
             }
-            
-            // 更新交易次数
-            const totalTradesEl = document.getElementById('total-trades');
-            if (totalTradesEl) {
-                totalTradesEl.textContent = data.totalTrades || 0;
-            }
-            
-            // 更新胜率
-            const winRateEl = document.getElementById('win-rate');
-            if (winRateEl) {
-                winRateEl.textContent = (data.winRate !== undefined && data.winRate !== null) 
-                    ? data.winRate.toFixed(1) + '%' 
-                    : '--';
-            }
-            
-            // 更新平均杠杆
-            const avgLeverageEl = document.getElementById('avg-leverage');
-            if (avgLeverageEl) {
-                avgLeverageEl.textContent = (data.avgLeverage !== undefined && data.avgLeverage !== null) 
-                    ? data.avgLeverage.toFixed(1) + 'x' 
-                    : '--';
-            }
-            
-            // 更新夏普比率
-            const sharpeRatioEl = document.getElementById('sharpe-ratio');
-            if (sharpeRatioEl) {
-                const sharpe = data.sharpeRatio ?? null;
-                sharpeRatioEl.textContent = sharpe !== null 
-                    ? (Math.abs(sharpe) < 0.01 ? sharpe.toFixed(4) : sharpe.toFixed(2))
-                    : '--';
-            }
-            
-            // 更新总盈亏
-            const totalPnlEl = document.getElementById('total-pnl');
-            if (totalPnlEl) {
-                const pnl = data.totalPnl ?? 0;
-                const pnlFormatted = '$' + Math.abs(pnl).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                totalPnlEl.textContent = pnl >= 0 ? '+' + pnlFormatted : '-' + pnlFormatted;
-                totalPnlEl.className = 'stats-data-value ' + (pnl >= 0 ? 'positive' : 'negative');
-            }
-            
-            // 更新总手续费
-            const totalFeesEl = document.getElementById('total-fees');
-            if (totalFeesEl) {
-                const fees = data.totalFees ?? 0;
-                totalFeesEl.textContent = '$' + Math.abs(fees).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }
-            
-            // 更新最大盈利
-            const biggestWinEl = document.getElementById('biggest-win');
-            if (biggestWinEl) {
-                const maxWin = data.maxWin || 0;
-                biggestWinEl.textContent = '$' + maxWin.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }
-            
-            // 更新最大亏损
-            const biggestLossEl = document.getElementById('biggest-loss');
-            if (biggestLossEl) {
-                const maxLoss = data.maxLoss || 0;
-                biggestLossEl.textContent = '-$' + Math.abs(maxLoss).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }
-            
-            // 更新持仓时间分布
-            if (data.holdTimes) {
-                const holdLongEl = document.getElementById('hold-time-long');
-                const holdShortEl = document.getElementById('hold-time-short');
-                const holdFlatEl = document.getElementById('hold-time-flat');
-                
-                const holdBarLongEl = document.getElementById('hold-bar-long');
-                const holdBarShortEl = document.getElementById('hold-bar-short');
-                const holdBarFlatEl = document.getElementById('hold-bar-flat');
-                
-                const longPercent = data.holdTimes.long.toFixed(1);
-                const shortPercent = data.holdTimes.short.toFixed(1);
-                const flatPercent = data.holdTimes.flat.toFixed(1);
-                
-                if (holdLongEl) {
-                    holdLongEl.textContent = longPercent + '%';
-                }
-                if (holdShortEl) {
-                    holdShortEl.textContent = shortPercent + '%';
-                }
-                if (holdFlatEl) {
-                    holdFlatEl.textContent = flatPercent + '%';
-                }
-                
-                // 更新进度条宽度和 ARIA 属性
-                if (holdBarLongEl) {
-                    holdBarLongEl.style.width = longPercent + '%';
-                    const progressBar = holdBarLongEl.parentElement;
-                    if (progressBar) {
-                        progressBar.setAttribute('aria-valuenow', longPercent);
-                        progressBar.setAttribute('aria-label', `做多持仓时间占比 ${longPercent}%`);
-                    }
-                }
-                if (holdBarShortEl) {
-                    holdBarShortEl.style.width = shortPercent + '%';
-                    const progressBar = holdBarShortEl.parentElement;
-                    if (progressBar) {
-                        progressBar.setAttribute('aria-valuenow', shortPercent);
-                        progressBar.setAttribute('aria-label', `做空持仓时间占比 ${shortPercent}%`);
-                    }
-                }
-                if (holdBarFlatEl) {
-                    holdBarFlatEl.style.width = flatPercent + '%';
-                    const progressBar = holdBarFlatEl.parentElement;
-                    if (progressBar) {
-                        progressBar.setAttribute('aria-valuenow', flatPercent);
-                        progressBar.setAttribute('aria-label', `空仓时间占比 ${flatPercent}%`);
-                    }
-                }
-            }
-            
-            // 更新交易偏好饼图
-            if (data.tradingPairs && data.tradingPairs.length > 0) {
-                this.drawTradingPairsChart(data.tradingPairs);
-            }
-            
+            this.renderKpi(data);
+            this.renderMetrics(data);
+            this.renderDistributions(data);
         } catch (error) {
             console.error('加载统计数据失败:', error);
         }
-    }
-
-    // 绘制交易偏好饼图
-    drawTradingPairsChart(tradingPairs) {
-        const canvas = document.getElementById('tradingPairsChart');
-        const legendContainer = document.getElementById('pairsLegend');
-        
-        if (!canvas || !legendContainer) return;
-        
-        const ctx = canvas.getContext('2d');
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = Math.min(centerX, centerY) - 20;
-        
-        // 定义颜色方案（类似资产偏好的颜色）
-        const colors = [
-            '#3B82F6', // 蓝色
-            '#F59E0B', // 黄色
-            '#8B5CF6', // 紫色
-            '#10B981', // 绿色
-            '#EF4444', // 红色
-            '#06B6D4', // 青色
-            '#F97316', // 橙色
-            '#EC4899', // 粉色
-            '#6366F1', // 靛蓝
-            '#14B8A6', // 青绿
-        ];
-        
-        // 清空画布
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 计算起始角度
-        let currentAngle = -Math.PI / 2; // 从顶部开始
-        
-        // 绘制饼图
-        tradingPairs.forEach((pair, index) => {
-            const sliceAngle = (pair.percentage / 100) * 2 * Math.PI;
-            const color = colors[index % colors.length];
-            
-            // 绘制扇形
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
-            ctx.lineTo(centerX, centerY);
-            ctx.fillStyle = color;
-            ctx.fill();
-            
-            // 绘制边框
-            ctx.strokeStyle = '#0a0a0a';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            currentAngle += sliceAngle;
-        });
-        
-        // 绘制中心圆（甜甜圈效果）
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius * 0.5, 0, 2 * Math.PI);
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fill();
-        
-        // 更新图例 - 紧凑版
-        legendContainer.innerHTML = tradingPairs.map((pair, index) => {
-            const color = colors[index % colors.length];
-            return `
-                <div class="pairs-legend-item">
-                    <div class="pairs-color-box" style="background-color: ${color}"></div>
-                    <span class="pairs-symbol">${pair.symbol}</span>
-                    <span class="pairs-percentage">${pair.percentage}%</span>
-                </div>
-            `;
-        }).join('');
     }
 
     // 启动数据更新

@@ -415,6 +415,8 @@ export function createApiRoutes() {
       
       let longCount = 0;
       let shortCount = 0;
+      let totalHoldingTimeMs = 0;
+      let holdingTimeCount = 0;
       const rows = tradesWithTimeResult.rows;
       
       for (const row of rows) {
@@ -424,12 +426,26 @@ export function createApiRoutes() {
         } else if (rowData.side === 'short') {
           shortCount++;
         }
+        
+        // 计算持仓时间
+        if (rowData.open_time && rowData.close_time) {
+          const openTime = new Date(rowData.open_time).getTime();
+          const closeTime = new Date(rowData.close_time).getTime();
+          const holdingTime = closeTime - openTime;
+          if (holdingTime > 0) {
+            totalHoldingTimeMs += holdingTime;
+            holdingTimeCount++;
+          }
+        }
       }
       
       const totalPositions = longCount + shortCount;
       const longPercent = totalPositions > 0 ? (longCount / totalPositions) * 100 : 0;
       const shortPercent = totalPositions > 0 ? (shortCount / totalPositions) * 100 : 0;
       const flatPercent = 100 - longPercent - shortPercent; // 平仓状态时间
+      
+      // 计算平均持仓时长（毫秒）
+      const avgHoldingMs = holdingTimeCount > 0 ? totalHoldingTimeMs / holdingTimeCount : null;
       
       // 计算夏普比率 (Sharpe Ratio)
       // 夏普比率 = (平均收益 - 无风险收益率) / 收益标准差
@@ -458,6 +474,56 @@ export function createApiRoutes() {
         }
       }
       
+      // 计算利润因子 (Profit Factor)
+      // 利润因子 = 总盈利 / 总亏损（绝对值）
+      let profitFactor = null;
+      const profitResult = await dbClient.execute(
+        "SELECT SUM(pnl) as total_profit FROM trades WHERE type = 'close' AND pnl IS NOT NULL AND pnl > 0"
+      );
+      const lossResult = await dbClient.execute(
+        "SELECT SUM(pnl) as total_loss FROM trades WHERE type = 'close' AND pnl IS NOT NULL AND pnl < 0"
+      );
+      const totalProfit = Number((profitResult.rows[0] as any)?.total_profit || 0);
+      const totalLoss = Math.abs(Number((lossResult.rows[0] as any)?.total_loss || 0));
+      
+      if (totalLoss > 0) {
+        profitFactor = totalProfit / totalLoss;
+      } else if (totalProfit > 0) {
+        profitFactor = 999; // 如果没有亏损但有盈利，设为一个很大的值
+      }
+      
+      // 计算最大回撤 (Max Drawdown)
+      // 从账户历史记录中计算
+      let maxDrawdown = null;
+      const historyResult = await dbClient.execute(
+        "SELECT total_value, unrealized_pnl, timestamp FROM account_history ORDER BY timestamp ASC"
+      );
+      
+      if (historyResult.rows.length > 1) {
+        let peak = 0;
+        let maxDD = 0;
+        
+        for (const row of historyResult.rows) {
+          const rowData = row as any;
+          const equity = Number(rowData.total_value || 0) + Number(rowData.unrealized_pnl || 0);
+          
+          // 更新峰值
+          if (equity > peak) {
+            peak = equity;
+          }
+          
+          // 计算当前回撤
+          if (peak > 0) {
+            const drawdown = ((peak - equity) / peak) * 100;
+            if (drawdown > maxDD) {
+              maxDD = drawdown;
+            }
+          }
+        }
+        
+        maxDrawdown = maxDD;
+      }
+      
       return c.json({
         totalTrades,
         winTrades,
@@ -480,6 +546,10 @@ export function createApiRoutes() {
           flat: Number(flatPercent.toFixed(1)),
         },
         tradingPairs: await getTradingPairsDistribution(),
+        // 新增字段
+        maxDrawdown: maxDrawdown !== null ? Number(maxDrawdown.toFixed(2)) : null,
+        profitFactor: profitFactor !== null ? Number(profitFactor.toFixed(2)) : null,
+        avgHoldingMs: avgHoldingMs !== null ? Math.round(avgHoldingMs) : null,
       });
     } catch (error: any) {
       return c.json({ error: error.message }, 500);

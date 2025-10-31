@@ -106,9 +106,9 @@ export function getStrategyParams(strategy: TradingStrategy): StrategyParams {
         strong: "10%",
       },
       stopLoss: {
-        low: -3.5,
-        mid: -3,
-        high: -2.5,
+        low: -4.5,
+        mid: -4,
+        high: -3.5,
       },
       entryCondition: "至少3个关键时间框架信号一致，4个或更多更佳",
       riskTolerance: "单笔交易风险控制在5-10%之间，严格控制回撤",
@@ -132,9 +132,9 @@ export function getStrategyParams(strategy: TradingStrategy): StrategyParams {
         strong: "15%",
       },
       stopLoss: {
-        low: -3,
-        mid: -2.5,
-        high: -2,
+        low: -3.5,
+        mid: -3,
+        high: -2.5,
       },
       entryCondition: "至少2个关键时间框架信号一致，3个或更多更佳",
       riskTolerance: "单笔交易风险控制在10-15%之间，平衡风险与收益",
@@ -213,12 +213,12 @@ function createAIProvider() {
  * 从环境变量读取交易策略
  */
 export function getTradingStrategy(): TradingStrategy {
-  const strategy = process.env.TRADING_STRATEGY || "balanced";
+  const strategy = process.env.TRADING_STRATEGY || "conservative";
   if (strategy === "conservative" || strategy === "balanced" || strategy === "aggressive") {
     return strategy;
   }
-  logger.warn(`未知的交易策略: ${strategy}，使用默认策略: balanced`);
-  return "balanced";
+  logger.warn(`未知的交易策略: ${strategy}，使用默认策略: conservative`);
+  return "conservative";
 }
 
 /**
