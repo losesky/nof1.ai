@@ -16,6 +16,7 @@ node_modules/
 # 构建输出
 # ===========================================
 dist/
+docs/
 build/
 *.tsbuildinfo
 

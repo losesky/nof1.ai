@@ -179,6 +179,7 @@
       <div class="stats-content">
         <!-- 左侧：核心指标 -->
         <div class="stats-metrics" role="region" aria-label="核心交易指标">
+          <!-- 第一行：基础指标 -->
           <div class="metric-row">
             <div class="metric-item" role="group" aria-labelledby="leverage-label">
               <span class="metric-label" id="leverage-label">平均杠杆</span>
@@ -194,14 +195,33 @@
             </div>
           </div>
           
+          <!-- 第二行：盈亏和费用 -->
+          <div class="metric-row">
+            <div class="metric-item highlight" role="group" aria-labelledby="pnl-label">
+              <span class="metric-label" id="pnl-label">总盈亏</span>
+              <span class="metric-value" id="total-pnl" aria-live="polite">--</span>
+            </div>
+            <div class="metric-item" role="group" aria-labelledby="fees-label">
+              <span class="metric-label" id="fees-label">总手续费</span>
+              <span class="metric-value" id="total-fees" aria-live="polite">--</span>
+            </div>
+          </div>
+          
+          <!-- 第三行：最大盈利和亏损 -->
           <div class="metric-row">
             <div class="metric-item highlight" role="group" aria-labelledby="win-label">
               <span class="metric-label" id="win-label">最大盈利</span>
-              <span class="metric-value positive" id="biggest-win" aria-live="polite">--</span>
+              <div class="metric-value-wrapper">
+                <span class="metric-value positive" id="biggest-win" aria-live="polite">--</span>
+                <span class="metric-detail" id="biggest-win-detail">--</span>
+              </div>
             </div>
             <div class="metric-item highlight" role="group" aria-labelledby="loss-label">
               <span class="metric-label" id="loss-label">最大亏损</span>
-              <span class="metric-value negative" id="biggest-loss" aria-live="polite">--</span>
+              <div class="metric-value-wrapper">
+                <span class="metric-value negative" id="biggest-loss" aria-live="polite">--</span>
+                <span class="metric-detail" id="biggest-loss-detail">--</span>
+              </div>
             </div>
           </div>
         </div>
@@ -326,7 +346,7 @@
                         <th>平仓价格</th>
                         <th>数量</th>
                         <th>持仓时间</th>
-                        <th>总手续费</th>
+                        <th>手续费</th>
                         <th>净盈亏</th>
                     </tr>
                 </thead>

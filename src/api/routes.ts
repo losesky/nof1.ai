@@ -341,16 +341,28 @@ export function createApiRoutes() {
       );
       const totalPnl = (pnlResult.rows[0] as any).total_pnl || 0;
       
-      // 获取最大单笔盈利和亏损
-      const maxWinResult = await dbClient.execute(
-        "SELECT MAX(pnl) as max_win FROM trades WHERE type = 'close' AND pnl IS NOT NULL"
+      // 计算总手续费 - 包含所有交易（开仓和平仓）
+      const feesResult = await dbClient.execute(
+        "SELECT SUM(fee) as total_fees FROM trades WHERE fee IS NOT NULL"
       );
-      const maxWin = (maxWinResult.rows[0] as any).max_win || 0;
+      const totalFees = (feesResult.rows[0] as any).total_fees || 0;
+      
+      // 获取最大单笔盈利和亏损（包含时间和币种信息）
+      const maxWinResult = await dbClient.execute(
+        "SELECT pnl, symbol, timestamp FROM trades WHERE type = 'close' AND pnl IS NOT NULL ORDER BY pnl DESC LIMIT 1"
+      );
+      const maxWinRow = maxWinResult.rows[0] as any;
+      const maxWin = maxWinRow?.pnl || 0;
+      const maxWinSymbol = maxWinRow?.symbol || "";
+      const maxWinTime = maxWinRow?.timestamp || "";
       
       const maxLossResult = await dbClient.execute(
-        "SELECT MIN(pnl) as max_loss FROM trades WHERE type = 'close' AND pnl IS NOT NULL"
+        "SELECT pnl, symbol, timestamp FROM trades WHERE type = 'close' AND pnl IS NOT NULL ORDER BY pnl ASC LIMIT 1"
       );
-      const maxLoss = (maxLossResult.rows[0] as any).max_loss || 0;
+      const maxLossRow = maxLossResult.rows[0] as any;
+      const maxLoss = maxLossRow?.pnl || 0;
+      const maxLossSymbol = maxLossRow?.symbol || "";
+      const maxLossTime = maxLossRow?.timestamp || "";
       
       // 计算平均杠杆 - 从所有开仓交易中计算
       const avgLeverageResult = await dbClient.execute(
@@ -389,6 +401,7 @@ export function createApiRoutes() {
       
       // 计算夏普比率 (Sharpe Ratio)
       // 夏普比率 = (平均收益 - 无风险收益率) / 收益标准差
+      // 注意：这里计算的是每笔交易的夏普比率，实际应用中通常需要年化
       let sharpeRatio = 0;
       if (totalTrades > 0) {
         // 获取所有已平仓交易的盈亏
@@ -418,11 +431,17 @@ export function createApiRoutes() {
         winTrades,
         lossTrades: totalTrades - winTrades,
         winRate,
-        totalPnl,
+        totalPnl: Number(totalPnl),
+        totalFees: Number(totalFees),
         maxWin,
+        maxWinSymbol,
+        maxWinTime,
         maxLoss,
+        maxLossSymbol,
+        maxLossTime,
         avgLeverage: Number(avgLeverage.toFixed(1)),
-        sharpeRatio: Number(sharpeRatio.toFixed(2)),
+        // 保留4位小数以显示小数值，避免四舍五入为0
+        sharpeRatio: Number(sharpeRatio.toFixed(4)),
         holdTimes: {
           long: Number(longPercent.toFixed(1)),
           short: Number(shortPercent.toFixed(1)),

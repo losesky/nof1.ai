@@ -408,6 +408,10 @@ class TradingMonitor {
             const response = await fetch('/api/stats');
             const data = await response.json();
             
+            // 调试日志
+            console.log('Stats API Response:', data);
+            console.log('Sharpe Ratio:', data.sharpeRatio);
+            
             if (data.error) {
                 console.error('获取统计数据失败:', data.error);
                 return;
@@ -416,34 +420,73 @@ class TradingMonitor {
             // 更新平均杠杆
             const avgLeverageEl = document.getElementById('avg-leverage');
             if (avgLeverageEl) {
-                avgLeverageEl.textContent = data.avgLeverage ? data.avgLeverage.toFixed(1) : '--';
+                avgLeverageEl.textContent = (data.avgLeverage !== undefined && data.avgLeverage !== null) 
+                    ? data.avgLeverage.toFixed(1) + 'x' 
+                    : '--';
             }
             
             // 更新胜率
             const winRateEl = document.getElementById('win-rate');
             if (winRateEl) {
-                winRateEl.textContent = data.winRate ? data.winRate.toFixed(1) + '%' : '--';
+                winRateEl.textContent = (data.winRate !== undefined && data.winRate !== null) 
+                    ? data.winRate.toFixed(1) + '%' 
+                    : '--';
             }
             
             // 更新夏普比率
             const sharpeRatioEl = document.getElementById('sharpe-ratio');
             if (sharpeRatioEl) {
-                const sharpe = data.sharpeRatio || 0;
-                sharpeRatioEl.textContent = sharpe ? sharpe.toFixed(2) : '--';
+                // 夏普比率可以是负数，所以不能用 || 0，而要用 ?? 0
+                const sharpe = data.sharpeRatio ?? null;
+                // 当夏普比率小于0.01时，显示4位小数以避免显示为0
+                sharpeRatioEl.textContent = sharpe !== null 
+                    ? (Math.abs(sharpe) < 0.01 ? sharpe.toFixed(4) : sharpe.toFixed(2))
+                    : '--';
+            }
+            
+            // 更新总盈亏
+            const totalPnlEl = document.getElementById('total-pnl');
+            if (totalPnlEl) {
+                const pnl = data.totalPnl ?? 0;
+                const pnlFormatted = '$' + Math.abs(pnl).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                totalPnlEl.textContent = pnl >= 0 ? '+' + pnlFormatted : '-' + pnlFormatted;
+                // 根据盈亏设置颜色类
+                totalPnlEl.className = 'metric-value ' + (pnl >= 0 ? 'positive' : 'negative');
+            }
+            
+            // 更新总手续费
+            const totalFeesEl = document.getElementById('total-fees');
+            if (totalFeesEl) {
+                const fees = data.totalFees ?? 0;
+                totalFeesEl.textContent = '$' + Math.abs(fees).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             }
             
             // 更新最大盈利
             const biggestWinEl = document.getElementById('biggest-win');
+            const biggestWinDetailEl = document.getElementById('biggest-win-detail');
             if (biggestWinEl) {
                 const maxWin = data.maxWin || 0;
                 biggestWinEl.textContent = '$' + maxWin.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             }
+            if (biggestWinDetailEl && data.maxWinSymbol && data.maxWinTime) {
+                const symbol = data.maxWinSymbol.replace('USDT', '');
+                const date = new Date(data.maxWinTime);
+                const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                biggestWinDetailEl.textContent = `${symbol} ${timeStr}`;
+            }
             
             // 更新最大亏损
             const biggestLossEl = document.getElementById('biggest-loss');
+            const biggestLossDetailEl = document.getElementById('biggest-loss-detail');
             if (biggestLossEl) {
                 const maxLoss = data.maxLoss || 0;
                 biggestLossEl.textContent = '-$' + Math.abs(maxLoss).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+            if (biggestLossDetailEl && data.maxLossSymbol && data.maxLossTime) {
+                const symbol = data.maxLossSymbol.replace('USDT', '');
+                const date = new Date(data.maxLossTime);
+                const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                biggestLossDetailEl.textContent = `${symbol} ${timeStr}`;
             }
             
             // 更新持仓时间分布
