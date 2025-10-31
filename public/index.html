@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes, viewport-fit=cover">
   
   <!-- Primary Meta Tags - Bilingual -->
   <title>open-nof1.ai - AI 驱动的加密货币交易监控系统 | Cryptocurrency Trading Monitor</title>
@@ -171,70 +171,70 @@
     </section>
 
     <!-- Trading Statistics Section -->
-    <section class="stats-section">
+    <section class="stats-section" aria-labelledby="stats-title">
       <div class="stats-header">
-        <h3 class="stats-title">交易统计</h3>
+        <h3 class="stats-title" id="stats-title">交易统计</h3>
       </div>
       
       <div class="stats-content">
         <!-- 左侧：核心指标 -->
-        <div class="stats-metrics">
+        <div class="stats-metrics" role="region" aria-label="核心交易指标">
           <div class="metric-row">
-            <div class="metric-item">
-              <span class="metric-label">平均杠杆</span>
-              <span class="metric-value" id="avg-leverage">--</span>
+            <div class="metric-item" role="group" aria-labelledby="leverage-label">
+              <span class="metric-label" id="leverage-label">平均杠杆</span>
+              <span class="metric-value" id="avg-leverage" aria-live="polite">--</span>
             </div>
-            <div class="metric-item">
-              <span class="metric-label">胜率</span>
-              <span class="metric-value" id="win-rate">--</span>
+            <div class="metric-item" role="group" aria-labelledby="winrate-label">
+              <span class="metric-label" id="winrate-label">胜率</span>
+              <span class="metric-value" id="win-rate" aria-live="polite">--</span>
             </div>
-            <div class="metric-item">
-              <span class="metric-label">夏普比率</span>
-              <span class="metric-value" id="sharpe-ratio">--</span>
+            <div class="metric-item" role="group" aria-labelledby="sharpe-label">
+              <span class="metric-label" id="sharpe-label">夏普比率</span>
+              <span class="metric-value" id="sharpe-ratio" aria-live="polite">--</span>
             </div>
           </div>
           
           <div class="metric-row">
-            <div class="metric-item highlight">
-              <span class="metric-label">最大盈利</span>
-              <span class="metric-value positive" id="biggest-win">--</span>
+            <div class="metric-item highlight" role="group" aria-labelledby="win-label">
+              <span class="metric-label" id="win-label">最大盈利</span>
+              <span class="metric-value positive" id="biggest-win" aria-live="polite">--</span>
             </div>
-            <div class="metric-item highlight">
-              <span class="metric-label">最大亏损</span>
-              <span class="metric-value negative" id="biggest-loss">--</span>
+            <div class="metric-item highlight" role="group" aria-labelledby="loss-label">
+              <span class="metric-label" id="loss-label">最大亏损</span>
+              <span class="metric-value negative" id="biggest-loss" aria-live="polite">--</span>
             </div>
           </div>
         </div>
         
         <!-- 右侧：持仓分布 -->
-        <div class="stats-distribution">
+        <div class="stats-distribution" role="region" aria-label="持仓时间分布">
           <div class="distribution-header">持仓时间分布</div>
           <div class="distribution-chart">
             <div class="distribution-item">
-              <div class="distribution-bar">
-                <div class="distribution-label">做多</div>
-                <div class="distribution-progress">
+              <div class="distribution-bar" role="group" aria-labelledby="long-label">
+                <div class="distribution-label" id="long-label">做多</div>
+                <div class="distribution-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                   <div class="distribution-fill long" id="hold-bar-long" style="width: 0%"></div>
                 </div>
-                <div class="distribution-value long" id="hold-time-long">--</div>
+                <div class="distribution-value long" id="hold-time-long" aria-live="polite">--</div>
               </div>
             </div>
             <div class="distribution-item">
-              <div class="distribution-bar">
-                <div class="distribution-label">做空</div>
-                <div class="distribution-progress">
+              <div class="distribution-bar" role="group" aria-labelledby="short-label">
+                <div class="distribution-label" id="short-label">做空</div>
+                <div class="distribution-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                   <div class="distribution-fill short" id="hold-bar-short" style="width: 0%"></div>
                 </div>
-                <div class="distribution-value short" id="hold-time-short">--</div>
+                <div class="distribution-value short" id="hold-time-short" aria-live="polite">--</div>
               </div>
             </div>
             <div class="distribution-item">
-              <div class="distribution-bar">
-                <div class="distribution-label">空仓</div>
-                <div class="distribution-progress">
+              <div class="distribution-bar" role="group" aria-labelledby="flat-label">
+                <div class="distribution-label" id="flat-label">空仓</div>
+                <div class="distribution-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                   <div class="distribution-fill flat" id="hold-bar-flat" style="width: 0%"></div>
                 </div>
-                <div class="distribution-value flat" id="hold-time-flat">--</div>
+                <div class="distribution-value flat" id="hold-time-flat" aria-live="polite">--</div>
               </div>
             </div>
           </div>

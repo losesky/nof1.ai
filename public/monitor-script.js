@@ -456,25 +456,44 @@ class TradingMonitor {
                 const holdBarShortEl = document.getElementById('hold-bar-short');
                 const holdBarFlatEl = document.getElementById('hold-bar-flat');
                 
+                const longPercent = data.holdTimes.long.toFixed(1);
+                const shortPercent = data.holdTimes.short.toFixed(1);
+                const flatPercent = data.holdTimes.flat.toFixed(1);
+                
                 if (holdLongEl) {
-                    holdLongEl.textContent = data.holdTimes.long.toFixed(1) + '%';
+                    holdLongEl.textContent = longPercent + '%';
                 }
                 if (holdShortEl) {
-                    holdShortEl.textContent = data.holdTimes.short.toFixed(1) + '%';
+                    holdShortEl.textContent = shortPercent + '%';
                 }
                 if (holdFlatEl) {
-                    holdFlatEl.textContent = data.holdTimes.flat.toFixed(1) + '%';
+                    holdFlatEl.textContent = flatPercent + '%';
                 }
                 
-                // 更新进度条宽度
+                // 更新进度条宽度和 ARIA 属性
                 if (holdBarLongEl) {
-                    holdBarLongEl.style.width = data.holdTimes.long.toFixed(1) + '%';
+                    holdBarLongEl.style.width = longPercent + '%';
+                    const progressBar = holdBarLongEl.parentElement;
+                    if (progressBar) {
+                        progressBar.setAttribute('aria-valuenow', longPercent);
+                        progressBar.setAttribute('aria-label', `做多持仓时间占比 ${longPercent}%`);
+                    }
                 }
                 if (holdBarShortEl) {
-                    holdBarShortEl.style.width = data.holdTimes.short.toFixed(1) + '%';
+                    holdBarShortEl.style.width = shortPercent + '%';
+                    const progressBar = holdBarShortEl.parentElement;
+                    if (progressBar) {
+                        progressBar.setAttribute('aria-valuenow', shortPercent);
+                        progressBar.setAttribute('aria-label', `做空持仓时间占比 ${shortPercent}%`);
+                    }
                 }
                 if (holdBarFlatEl) {
-                    holdBarFlatEl.style.width = data.holdTimes.flat.toFixed(1) + '%';
+                    holdBarFlatEl.style.width = flatPercent + '%';
+                    const progressBar = holdBarFlatEl.parentElement;
+                    if (progressBar) {
+                        progressBar.setAttribute('aria-valuenow', flatPercent);
+                        progressBar.setAttribute('aria-label', `空仓时间占比 ${flatPercent}%`);
+                    }
                 }
             }
             
