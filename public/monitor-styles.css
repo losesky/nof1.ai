@@ -307,6 +307,181 @@ body {
     margin: 0;
 }
 
+/* 紧凑布局：左侧数据列表 + 右侧饼图 */
+.stats-compact-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+/* 左侧：数据行列表 */
+.stats-data-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.stats-data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.stats-data-row:hover {
+    background-color: rgba(0, 255, 170, 0.03);
+}
+
+.stats-data-row.highlight {
+    background-color: rgba(0, 255, 170, 0.05);
+}
+
+.stats-data-label {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.stats-data-value {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+}
+
+.stats-data-value.positive {
+    color: var(--accent-green);
+}
+
+.stats-data-value.negative {
+    color: var(--accent-red);
+}
+
+/* 持仓时间分布 */
+.stats-hold-times {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.hold-time-title {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hold-time-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.hold-label {
+    font-size: 0.85rem;
+}
+
+.hold-label.long {
+    color: var(--accent-green);
+}
+
+.hold-label.short {
+    color: var(--accent-red);
+}
+
+.hold-label.flat {
+    color: var(--accent-yellow);
+}
+
+.hold-value {
+    font-size: 0.95rem;
+    font-weight: bold;
+}
+
+.hold-value.long {
+    color: var(--accent-green);
+}
+
+.hold-value.short {
+    color: var(--accent-red);
+}
+
+.hold-value.flat {
+    color: var(--accent-yellow);
+}
+
+/* 右侧：交易偏好饼图 */
+.stats-chart-area {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.stats-chart-title {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stats-chart-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem 0;
+}
+
+.stats-pairs-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.pairs-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    flex: 1 1 auto;
+    min-width: 120px;
+}
+
+.pairs-legend-item:hover {
+    border-color: var(--text-dim);
+    background-color: rgba(0, 255, 170, 0.05);
+}
+
+.pairs-color-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.pairs-symbol {
+    font-weight: bold;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.pairs-percentage {
+    color: var(--accent-green);
+    font-weight: bold;
+    margin-left: auto;
+}
+
 .stats-content {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -492,209 +667,119 @@ body {
     color: var(--accent-yellow);
 }
 
-.stats-section {
+/* Trading Pairs Distribution Section */
+.trading-pairs-section {
     grid-column: 1 / 3;
-    grid-row: 2 / 3;
+    grid-row: 6 / 7;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 1.5rem;
 }
 
-.stats-header {
+.pairs-header {
     margin-bottom: 1.5rem;
     padding-bottom: 0.8rem;
     border-bottom: 1px solid var(--border-color);
 }
 
-.stats-title {
+.pairs-title {
     font-size: 1rem;
     color: var(--text-primary);
     margin: 0;
 }
 
-.stats-content {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
+.pairs-content {
+    display: flex;
     gap: 2rem;
+    align-items: flex-start;
+    min-height: 300px;
 }
 
-/* 左侧指标区域 */
-.stats-metrics {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+.pairs-chart-container {
+    flex-shrink: 0;
+    width: 300px;
+    height: 300px;
+    position: relative;
 }
 
-.metric-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-}
-
-/* 第二行：总盈亏和总手续费，2列布局 */
-.stats-metrics .metric-row:nth-child(2) {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-/* 第三行：最大盈利和最大亏损，2列布局 */
-.stats-metrics .metric-row:nth-child(3) {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.metric-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 1rem;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    transition: border-color 0.3s ease;
-}
-
-.metric-item:hover {
-    border-color: var(--text-dim);
-}
-
-.metric-item.highlight {
-    background: linear-gradient(135deg, rgba(0, 255, 170, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
-}
-
-.metric-label {
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.metric-value {
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: var(--text-primary);
-    font-family: 'Courier New', monospace;
-}
-
-.metric-value.positive {
-    color: var(--accent-green);
-}
-
-.metric-value.negative {
-    color: var(--accent-red);
-}
-
-/* 指标值包装器 - 用于横向排列数值和详情 */
-.metric-value-wrapper {
-    display: flex;
-    align-items: baseline;
-    gap: 0.8rem;
-    flex-wrap: wrap;
-}
-
-/* 指标详细信息（时间和币种） */
-.metric-detail {
-    font-size: 0.85rem;
-    color: var(--text-dim);
-    font-family: 'Courier New', monospace;
-    line-height: 1.4;
-    opacity: 0.85;
-    white-space: nowrap;
-}
-
-.metric-detail::before {
-    content: '(';
-}
-
-.metric-detail::after {
-    content: ')';
-}
-
-/* 右侧分布图 */
-.stats-distribution {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-}
-
-.distribution-header {
-    font-size: 0.85rem;
-    color: var(--text-primary);
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 0.5rem;
-}
-
-.distribution-chart {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+.pairs-legend {
     flex: 1;
-    justify-content: center;
-}
-
-.distribution-item {
     display: flex;
     flex-direction: column;
-}
-
-.distribution-bar {
-    display: grid;
-    grid-template-columns: 60px 1fr 60px;
     gap: 0.8rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.pairs-legend-item {
+    display: flex;
     align-items: center;
-}
-
-.distribution-label {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    text-align: right;
-}
-
-.distribution-progress {
-    height: 24px;
-    background-color: rgba(0, 255, 170, 0.1);
-    border-radius: 12px;
-    overflow: hidden;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: all 0.3s ease;
 }
 
-.distribution-fill {
-    height: 100%;
-    transition: width 0.5s ease;
-    border-radius: 12px;
+.pairs-legend-item:hover {
+    border-color: var(--text-dim);
+    background-color: rgba(0, 255, 170, 0.05);
 }
 
-.distribution-fill.long {
-    background: linear-gradient(90deg, var(--accent-green) 0%, rgba(0, 255, 170, 0.7) 100%);
+.pairs-legend-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-.distribution-fill.short {
-    background: linear-gradient(90deg, var(--accent-red) 0%, rgba(255, 0, 0, 0.7) 100%);
+.pairs-color-box {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
 }
 
-.distribution-fill.flat {
-    background: linear-gradient(90deg, var(--accent-yellow) 0%, rgba(255, 255, 0, 0.7) 100%);
-}
-
-.distribution-value {
-    font-size: 0.9rem;
+.pairs-symbol {
+    font-size: 0.95rem;
+    color: var(--text-primary);
     font-weight: bold;
-    text-align: left;
+    min-width: 60px;
 }
 
-.distribution-value.long {
+.pairs-count {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.pairs-percentage {
+    font-size: 1.1rem;
     color: var(--accent-green);
+    font-weight: bold;
 }
 
-.distribution-value.short {
-    color: var(--accent-red);
-}
-
-.distribution-value.flat {
-    color: var(--accent-yellow);
+/* 新增：768px以下的响应式样式 */
+@media (max-width: 768px) {
+    .trading-pairs-section {
+        grid-column: 1 / 2;
+        grid-row: 7 / 8;
+    }
+    
+    .pairs-content {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .pairs-chart-container {
+        width: 250px;
+        height: 250px;
+        margin: 0 auto;
+    }
+    
+    #tradingPairsChart {
+        width: 250px;
+        height: 250px;
+    }
 }
 
 /* Account Section - Binance Style */
@@ -982,7 +1067,7 @@ body {
 /* Trades Section */
 .trades-section {
     grid-column: 1 / 3;
-    grid-row: 5 / 6;
+    grid-row: 7 / 8;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 1.5rem;
@@ -1345,10 +1430,43 @@ body {
         grid-row: 5 / 6;
     }
 
+    /* 交易偏好 */
+    .trading-pairs-section {
+        grid-column: 1 / 2;
+        grid-row: 6 / 7;
+    }
+    
     /* 交易历史 */
     .trades-section {
         grid-column: 1 / 2;
-        grid-row: 6 / 7;
+        grid-row: 7 / 8;
+    }
+    
+    /* 交易统计紧凑布局响应式 */
+    .stats-compact-layout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .stats-chart-container canvas {
+        width: 240px !important;
+        height: 240px !important;
+    }
+    
+    .pairs-content {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .pairs-chart-container {
+        width: 250px;
+        height: 250px;
+        margin: 0 auto;
+    }
+    
+    #tradingPairsChart {
+        width: 250px;
+        height: 250px;
     }
 }
 

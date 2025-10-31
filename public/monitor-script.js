@@ -417,12 +417,10 @@ class TradingMonitor {
                 return;
             }
             
-            // 更新平均杠杆
-            const avgLeverageEl = document.getElementById('avg-leverage');
-            if (avgLeverageEl) {
-                avgLeverageEl.textContent = (data.avgLeverage !== undefined && data.avgLeverage !== null) 
-                    ? data.avgLeverage.toFixed(1) + 'x' 
-                    : '--';
+            // 更新交易次数
+            const totalTradesEl = document.getElementById('total-trades');
+            if (totalTradesEl) {
+                totalTradesEl.textContent = data.totalTrades || 0;
             }
             
             // 更新胜率
@@ -433,12 +431,18 @@ class TradingMonitor {
                     : '--';
             }
             
+            // 更新平均杠杆
+            const avgLeverageEl = document.getElementById('avg-leverage');
+            if (avgLeverageEl) {
+                avgLeverageEl.textContent = (data.avgLeverage !== undefined && data.avgLeverage !== null) 
+                    ? data.avgLeverage.toFixed(1) + 'x' 
+                    : '--';
+            }
+            
             // 更新夏普比率
             const sharpeRatioEl = document.getElementById('sharpe-ratio');
             if (sharpeRatioEl) {
-                // 夏普比率可以是负数，所以不能用 || 0，而要用 ?? 0
                 const sharpe = data.sharpeRatio ?? null;
-                // 当夏普比率小于0.01时，显示4位小数以避免显示为0
                 sharpeRatioEl.textContent = sharpe !== null 
                     ? (Math.abs(sharpe) < 0.01 ? sharpe.toFixed(4) : sharpe.toFixed(2))
                     : '--';
@@ -450,8 +454,7 @@ class TradingMonitor {
                 const pnl = data.totalPnl ?? 0;
                 const pnlFormatted = '$' + Math.abs(pnl).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
                 totalPnlEl.textContent = pnl >= 0 ? '+' + pnlFormatted : '-' + pnlFormatted;
-                // 根据盈亏设置颜色类
-                totalPnlEl.className = 'metric-value ' + (pnl >= 0 ? 'positive' : 'negative');
+                totalPnlEl.className = 'stats-data-value ' + (pnl >= 0 ? 'positive' : 'negative');
             }
             
             // 更新总手续费
@@ -463,30 +466,16 @@ class TradingMonitor {
             
             // 更新最大盈利
             const biggestWinEl = document.getElementById('biggest-win');
-            const biggestWinDetailEl = document.getElementById('biggest-win-detail');
             if (biggestWinEl) {
                 const maxWin = data.maxWin || 0;
                 biggestWinEl.textContent = '$' + maxWin.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             }
-            if (biggestWinDetailEl && data.maxWinSymbol && data.maxWinTime) {
-                const symbol = data.maxWinSymbol.replace('USDT', '');
-                const date = new Date(data.maxWinTime);
-                const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                biggestWinDetailEl.textContent = `${symbol} ${timeStr}`;
-            }
             
             // 更新最大亏损
             const biggestLossEl = document.getElementById('biggest-loss');
-            const biggestLossDetailEl = document.getElementById('biggest-loss-detail');
             if (biggestLossEl) {
                 const maxLoss = data.maxLoss || 0;
                 biggestLossEl.textContent = '-$' + Math.abs(maxLoss).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }
-            if (biggestLossDetailEl && data.maxLossSymbol && data.maxLossTime) {
-                const symbol = data.maxLossSymbol.replace('USDT', '');
-                const date = new Date(data.maxLossTime);
-                const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                biggestLossDetailEl.textContent = `${symbol} ${timeStr}`;
             }
             
             // 更新持仓时间分布
@@ -540,9 +529,85 @@ class TradingMonitor {
                 }
             }
             
+            // 更新交易偏好饼图
+            if (data.tradingPairs && data.tradingPairs.length > 0) {
+                this.drawTradingPairsChart(data.tradingPairs);
+            }
+            
         } catch (error) {
             console.error('加载统计数据失败:', error);
         }
+    }
+
+    // 绘制交易偏好饼图
+    drawTradingPairsChart(tradingPairs) {
+        const canvas = document.getElementById('tradingPairsChart');
+        const legendContainer = document.getElementById('pairsLegend');
+        
+        if (!canvas || !legendContainer) return;
+        
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = Math.min(centerX, centerY) - 20;
+        
+        // 定义颜色方案（类似资产偏好的颜色）
+        const colors = [
+            '#3B82F6', // 蓝色
+            '#F59E0B', // 黄色
+            '#8B5CF6', // 紫色
+            '#10B981', // 绿色
+            '#EF4444', // 红色
+            '#06B6D4', // 青色
+            '#F97316', // 橙色
+            '#EC4899', // 粉色
+            '#6366F1', // 靛蓝
+            '#14B8A6', // 青绿
+        ];
+        
+        // 清空画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 计算起始角度
+        let currentAngle = -Math.PI / 2; // 从顶部开始
+        
+        // 绘制饼图
+        tradingPairs.forEach((pair, index) => {
+            const sliceAngle = (pair.percentage / 100) * 2 * Math.PI;
+            const color = colors[index % colors.length];
+            
+            // 绘制扇形
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+            ctx.lineTo(centerX, centerY);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            // 绘制边框
+            ctx.strokeStyle = '#0a0a0a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            currentAngle += sliceAngle;
+        });
+        
+        // 绘制中心圆（甜甜圈效果）
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius * 0.5, 0, 2 * Math.PI);
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fill();
+        
+        // 更新图例 - 紧凑版
+        legendContainer.innerHTML = tradingPairs.map((pair, index) => {
+            const color = colors[index % colors.length];
+            return `
+                <div class="pairs-legend-item">
+                    <div class="pairs-color-box" style="background-color: ${color}"></div>
+                    <span class="pairs-symbol">${pair.symbol}</span>
+                    <span class="pairs-percentage">${pair.percentage}%</span>
+                </div>
+            `;
+        }).join('');
     }
 
     // 启动数据更新

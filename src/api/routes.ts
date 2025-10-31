@@ -316,6 +316,38 @@ export function createApiRoutes() {
   });
 
   /**
+   * 获取交易对分布统计
+   */
+  async function getTradingPairsDistribution() {
+    try {
+      // 统计每个交易对的交易次数（只统计已完成的交易）
+      const result = await dbClient.execute(
+        `SELECT symbol, COUNT(*) as count 
+         FROM trades 
+         WHERE type = 'close' AND pnl IS NOT NULL 
+         GROUP BY symbol 
+         ORDER BY count DESC 
+         LIMIT 10`
+      );
+      
+      const totalCount = result.rows.reduce((sum, row: any) => sum + Number(row.count), 0);
+      
+      return result.rows.map((row: any) => {
+        const count = Number(row.count);
+        const percentage = totalCount > 0 ? (count / totalCount) * 100 : 0;
+        return {
+          symbol: (row.symbol as string).replace('USDT', ''),
+          count,
+          percentage: Number(percentage.toFixed(2)),
+        };
+      });
+    } catch (error) {
+      logger.error("获取交易对分布失败:", error as any);
+      return [];
+    }
+  }
+
+  /**
    * 获取交易统计
    */
   app.get("/api/stats", async (c) => {
@@ -447,6 +479,7 @@ export function createApiRoutes() {
           short: Number(shortPercent.toFixed(1)),
           flat: Number(flatPercent.toFixed(1)),
         },
+        tradingPairs: await getTradingPairsDistribution(),
       });
     } catch (error: any) {
       return c.json({ error: error.message }, 500);
